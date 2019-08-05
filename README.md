@@ -9,7 +9,7 @@ ic = ic.subtract_Ih(th=1000.1).restrict(t0=1000.1, tf=11000.1) # subtract holdin
 ic.plot(sweeps=[0]) # plot first sweep
 ```
 <p align="center">
-  <img src=/ic_plot.png>
+  <img src=/examples/ic_plot.png>
 </p>
 
 ### Simulating GLM spike train
@@ -23,7 +23,7 @@ glm_fit.plot_filters()
 ```
 
 <p align="center">
-  <img src=filters.png>
+  <img src=./examples/filters.png>
 </p>
 
 ```python
