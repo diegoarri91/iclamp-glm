@@ -516,7 +516,7 @@ class GLMFitter:
     def plot_filters(self, axs=None):
 
         if axs is None:
-            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(10, 4), ncols=2)
+            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(12, 4), ncols=2)
             ax_kappa.set_xlabel('time'); ax_kappa.set_ylabel('kappa')
             ax_eta.set_xlabel('time'); ax_eta.set_ylabel('eta')
             ax_kappa.spines['right'].set_visible(False)
@@ -531,6 +531,8 @@ class GLMFitter:
         ax_kappa = self.glm.kappa.plot(t_kappa, ax=ax_kappa)
         t_eta = np.arange(0., self.glm.eta.tbins[-1], .1)
         ax_eta = self.glm.eta.plot(t_eta, ax=ax_eta)
+
+        return fig, (ax_kappa, ax_eta)
 
     def plot_fit(self):
 
@@ -676,7 +678,7 @@ class GLMFitter:
 
     def plot_raster(self):
 
-        fig, axs = plt.subplots(figsize=(10, 7), nrows=3, sharex=True)
+        fig, axs = plt.subplots(figsize=(12, 7), nrows=3, sharex=True)
         fig.subplots_adjust(hspace=0)
 
         st_exp = SpikeTrain(self.ic.t, self.mask_spikes)
@@ -689,9 +691,15 @@ class GLMFitter:
 
         axs[0].xaxis.set_visible(False)
         axs[0].set_yticks([])
+        axs[0].spines['left'].set_visible(False)
+        axs[0].spines['bottom'].set_visible(False)
         axs[0].set_ylabel('data')
         axs[1].xaxis.set_visible(False)
         axs[1].set_yticks([])
+        axs[1].spines['left'].set_visible(False)
+        axs[1].spines['bottom'].set_visible(False)
         axs[1].set_ylabel('GLM')
         axs[2].set_xlabel('time')
+
+        return fig, axs
 
