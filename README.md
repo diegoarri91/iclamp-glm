@@ -32,7 +32,7 @@ glm_fit.psth(psth_kernel=KernelFun.gaussian_delta(delta=40))
 glm_fit.plot_raster()
 ```
 <p align="center">
-  <img src=examples/fit_plot.png>
+  <img src=examples/raster_plot.png>
 </p>
 
 ## Documenation
