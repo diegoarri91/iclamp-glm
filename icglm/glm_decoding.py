@@ -4,15 +4,13 @@ import numpy as np
 from scipy.linalg import solveh_banded, cholesky_banded, cho_solve_banded, solve_triangular
 import time
 
-from .glm import GLM
 from .kernels import KernelVals
-
-from fun_signals import get_dt, get_arg, diag_indices
+from .signals import get_arg, get_dt, diag_indices
 
 
 class GLMDecoder:
 
-    def __init__(self, glms=None, t=None, mask_spk=None, mu_xi=None, sd_xi=None, tau=None, Ih=None, Imu=None, Isd=None, I_true=None,
+    def __init__(self, glms=None, t=None, mask_spk=None, mu_xi=0, sd_xi=1, tau=None, Ih=None, Imu=None, Isd=None, I_true=None,
                  n_subsample=None, neurons=None, files=None, trials=None, fit_files=None):
 
         self.neurons = neurons  # saved
@@ -202,10 +200,10 @@ class GLMDecoder:
         if optimization_kwargs is None:
             optimization_kwargs = {}
         
-        max_iterations = optimization_kwargs.get('max_iterations', int(5e3))
-        stop_cond = optimization_kwargs.get('stop_cond', 1e-7)
-        learning_rate = optimization_kwargs.get('learning_rate', 1e-1)
-        initial_learning_rate = optimization_kwargs.get('initial_learning_rate', learning_rate * 1e-1)
+        max_iterations = optimization_kwargs.get('max_iterations', 100)
+        stop_cond = optimization_kwargs.get('stop_cond', 1e-3)
+        learning_rate = optimization_kwargs.get('learning_rate', 5e-1)
+        initial_learning_rate = optimization_kwargs.get('initial_learning_rate', learning_rate)
         optimization_kwargs = {'max_iterations': max_iterations, 'stop_cond': stop_cond, 'learning_rate': learning_rate,
                                'initial_learning_rate': initial_learning_rate}
 

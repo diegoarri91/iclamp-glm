@@ -369,10 +369,10 @@ class GLMFitter:
         if newton_kwargs is None:
             newton_kwargs = {}
 
-        max_iterations = newton_kwargs.get('max_iterations', int(2e3))
+        max_iterations = newton_kwargs.get('max_iterations', 100)
         stop_cond = newton_kwargs.get('stop_cond', 5e-4)
-        learning_rate = newton_kwargs.get('learning_rate', 1e-1)
-        initial_learning_rate = newton_kwargs.get('initial_learning_rate', learning_rate * 1e-1)
+        learning_rate = newton_kwargs.get('learning_rate', 1e0)
+        initial_learning_rate = newton_kwargs.get('initial_learning_rate', learning_rate)
         newton_kwargs = {'max_iterations': max_iterations, 'stop_cond': stop_cond, 'learning_rate': learning_rate,
                          'initial_learning_rate': initial_learning_rate}
 

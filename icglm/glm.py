@@ -1,6 +1,5 @@
 import numpy as np
 
-from .kernels import KernelFun
 from .masks import shift_mask
 from .signals import get_dt
 
@@ -66,7 +65,7 @@ class GLM:
         else:
             shape = I.shape
 
-        arg_spikes = np.where(shift_array(mask_spk, 1, fill_value=False))
+        arg_spikes = np.where(shift_mask(mask_spk, 1, fill_value=False))
         t_spikes = (t[arg_spikes[0]], arg_spikes[1])
 
         dt = get_dt(t)

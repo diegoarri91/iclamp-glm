@@ -271,3 +271,8 @@ class KernelRect(Kernel):
         
         return X
     
+class KernelVals(Kernel):
+
+    def __init__(self, values=None, support=None):
+        self.values = values
+        self.support = np.array(support)

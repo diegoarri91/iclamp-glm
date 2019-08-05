@@ -70,12 +70,24 @@ class IClamp:
     def plot(self, axv=None, axstim=None, mask_spikes_kwargs={}, **kwargs):
 
         sweeps = kwargs.get('sweeps', np.arange(self.nsweeps))
+        sweeps = np.array(sweeps)
         spikes = kwargs.get('spikes', False)
 
         if axv is None:
-            figsize = kwargs.get('figsize', (8, 5))
-            fig, (axv, axstim) = plt.subplots(figsize=figsize, nrows=2, sharex=True)
-            fig.tight_layout()
+            fig = plt.figure(figsize=(12, 5))
+            fig.subplots_adjust(hspace=.5)
+            r = 8
+            axv = plt.subplot2grid((10, 1), (0, 0), rowspan=r)
+            axv.xaxis.set_visible(False)
+            axv.set_ylabel('voltage')
+            axv.spines['right'].set_visible(False)
+            axv.spines['top'].set_visible(False)
+            axv.spines['bottom'].set_visible(False)
+            axstim = plt.subplot2grid((10, 1), (r, 0), rowspan=10 - r)
+            axstim.spines['top'].set_visible(False)
+            axstim.spines['right'].set_visible(False)
+            axstim.set_xlabel('time')
+            axstim.set_ylabel('stim')
 
         mask_spike = self.mask_spikes(**mask_spikes_kwargs)
 
@@ -84,9 +96,9 @@ class IClamp:
 
         if spikes:
             for sw in sweeps:
-                axv.plot(self.t[mask_spike[:, sw]], self.data[mask_spike[:, sw], sw], 'o')
+                axv.plot(self.t[mask_spike[:, sw]], self.data[mask_spike[:, sw], sw], 'o', lw=.7)
 
-        return axv, axstim
+        return fig, (axv, axstim)
 
     def restrict(self, t0=None, tf=None, reset_time=True):
         
