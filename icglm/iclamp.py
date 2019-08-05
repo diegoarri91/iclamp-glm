@@ -74,7 +74,7 @@ class IClamp:
         spikes = kwargs.get('spikes', False)
 
         if axv is None:
-            fig = plt.figure(figsize=(12, 5))
+            fig = plt.figure(figsize=(12, 6.5))
             fig.subplots_adjust(hspace=.5)
             r = 8
             axv = plt.subplot2grid((10, 1), (0, 0), rowspan=r)

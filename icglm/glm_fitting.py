@@ -516,7 +516,7 @@ class GLMFitter:
     def plot_filters(self, axs=None):
 
         if axs is None:
-            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(12, 4), ncols=2)
+            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(12, 6.5), ncols=2)
             ax_kappa.set_xlabel('time'); ax_kappa.set_ylabel('kappa')
             ax_eta.set_xlabel('time'); ax_eta.set_ylabel('eta')
             ax_kappa.spines['right'].set_visible(False)
