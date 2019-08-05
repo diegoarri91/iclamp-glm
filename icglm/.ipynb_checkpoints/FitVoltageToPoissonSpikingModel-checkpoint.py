@@ -31,7 +31,7 @@ class FitVoltageToPoissonSpikingModel:
     def save(self, folder, file):
         pass
     
-    def load(self, folder, file, dic_files, root_folder = '/home/diego/Dropbox/data/patch/'):
+    def load(self, folder, file, dic_files, root_folder = '/home/diego/Dropbox/signal/patch/'):
         pass
         
     ####################################################################################################################

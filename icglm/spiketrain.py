@@ -1,11 +1,9 @@
-#!/usr/bin/env
-
 import itertools
 import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from fun_signals import get_dt, get_arg, coincident_trues_arg_apart
+from .signals import get_arg, get_dt
 
 
 class SpikeTrain:

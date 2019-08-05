@@ -7,9 +7,9 @@ import time
 from .glm import GLM
 from .iclamp import IClamp
 from .kernels import KernelRect
+from .masks import shift_mask
+from .signals import get_arg, diag_indices
 from .spiketrain import SpikeTrain
-
-from fun_signals import get_arg, shift_array, mask_thres_crossings, extend_trues
 
 
 class GLMFitter:
@@ -176,7 +176,7 @@ class GLMFitter:
         Y_kappa = self.glm.kappa.convolve_basis_continuous(self.ic.t, self.ic.stim - self.Ih)
 
         if self.glm.eta is not None:
-            args = np.where(shift_array(self.mask_spikes, 1, fill_value=False))
+            args = np.where(shift_mask(self.mask_spikes, 1, fill_value=False))
             t_spk = (self.ic.t[args[0]], ) + args[1:]
             n_eta = self.glm.eta.nbasis
             Y_eta = self.glm.eta.convolve_basis_discrete(self.ic.t, t_spk, shape=self.ic.shape)
@@ -259,8 +259,6 @@ class GLMFitter:
         return logL
 
     def gh_log_prior(self, theta, prior, prior_pars):
-
-        from fun_signals import diag_indices
         
         n_kappa = self.glm.kappa.nbasis
 
@@ -362,6 +360,11 @@ class GLMFitter:
         return -log_prior, -g_log_prior, -_h_log_prior
 
     def fit(self, theta0=None, newton_kwargs=None, verbose=False, tbins_kappa=None, tbins_eta=None, prior=None, prior_pars=None):
+
+        if theta0 is None:
+            theta0_kappa = 1e-2 * np.exp(-tbins_kappa[:-1] / 50)
+            theta0_eta = 1e0 * np.exp(-tbins_eta[:-1] / 50)
+            theta0 = np.concatenate((np.array([-np.log(5e-5)]), theta0_kappa, theta0_eta))
 
         if newton_kwargs is None:
             newton_kwargs = {}
@@ -510,6 +513,25 @@ class GLMFitter:
 
         return self
 
+    def plot_filters(self, axs=None):
+
+        if axs is None:
+            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(10, 4), ncols=2)
+            ax_kappa.set_xlabel('time'); ax_kappa.set_ylabel('kappa')
+            ax_eta.set_xlabel('time'); ax_eta.set_ylabel('eta')
+            ax_kappa.spines['right'].set_visible(False)
+            ax_kappa.spines['top'].set_visible(False)
+            ax_eta.spines['right'].set_visible(False)
+            ax_eta.spines['top'].set_visible(False)
+        else:
+            ax_kappa = axs[0]
+            ax_eta = axs[1]
+
+        t_kappa = np.arange(0., self.glm.kappa.tbins[-1], .1)
+        ax_kappa = self.glm.kappa.plot(t_kappa, ax=ax_kappa)
+        t_eta = np.arange(0., self.glm.eta.tbins[-1], .1)
+        ax_eta = self.glm.eta.plot(t_eta, ax=ax_eta)
+
     def plot_fit(self):
 
         fig = plt.figure(figsize=(10, 7.5))
@@ -555,16 +577,6 @@ class GLMFitter:
             
         fig, axs = self.plot_fit()
         fig.savefig(folder + pdf_name + '.pdf')
-        
-    
-    def plot_filters(self):
-        
-        fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(10, 4), ncols=2)
-        t_kappa = np.arange(0., self.glm.kappa.tbins[-1], .1)
-        self.glm.kappa.plot(t_kappa, ax=ax_kappa)
-        t_eta = np.arange(0., self.glm.eta.tbins[-1], .1)
-        self.glm.eta.plot(t_eta, ax=ax_eta)
-        
 
     ###################################################################################################
     # GOODNESS OF FIT
@@ -602,13 +614,13 @@ class GLMFitter:
 
         return self.Ma
 
-    def plot_psth(self, ax=None):
+    def plot_psth(self, ax=None, lw=.6):
 
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 5), ncols=1)
 
-        ax.plot(self.ic.t, self.psth_exp, lw=.6)
-        ax.plot(self.ic.t, self.psth_model, lw=.6)
+        ax.plot(self.ic.t, self.psth_exp, lw=lw)
+        ax.plot(self.ic.t, self.psth_model, lw=lw)
         ax.set_ylim(-.001, np.max(np.concatenate((self.psth_model, self.psth_exp), axis=1)) * 1.15)
 
         if self.Md is not None:
@@ -661,5 +673,25 @@ class GLMFitter:
             ax[1].plot(self.z[sw][:-1], self.z[sw][1:], 'C0.')
 
         return ax
-        
-        
+
+    def plot_raster(self):
+
+        fig, axs = plt.subplots(figsize=(10, 7), nrows=3, sharex=True)
+        fig.subplots_adjust(hspace=0)
+
+        st_exp = SpikeTrain(self.ic.t, self.mask_spikes)
+        st_model = SpikeTrain(self.ic.t, self.mask_spikes_model)
+
+        st_exp.plot(ax=axs[0], color='C0')
+        st_model.plot(ax=axs[1], color='C1')
+
+        self.plot_psth(axs[2], lw=1.5)
+
+        axs[0].xaxis.set_visible(False)
+        axs[0].set_yticks([])
+        axs[0].set_ylabel('data')
+        axs[1].xaxis.set_visible(False)
+        axs[1].set_yticks([])
+        axs[1].set_ylabel('GLM')
+        axs[2].set_xlabel('time')
+

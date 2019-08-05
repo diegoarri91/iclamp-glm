@@ -1,10 +1,8 @@
 import numpy as np
 import matplotlib.pyplot as plt
-
 from scipy.signal import fftconvolve, convolve
 
-from fun_signals import get_dt, get_arg, searchsorted
-from fun_math import solve_Xtheta_y, estimate_R2, estimate_rmse
+from .signals import get_dt, searchsorted
 
 class Kernel:
 
@@ -18,7 +16,6 @@ class Kernel:
             t = np.arange(self.support[0], self.support[1] + dt, dt)
 
         if ax is None:
-            
             figsize = kwargs.get('figsize', (8, 5) )
             fig, ax = plt.subplots(figsize = figsize)
 
@@ -93,59 +90,6 @@ class Kernel:
             else:
                 return None
             # NO TOCAR A MENOS QUE ESTE MUY SEGURO
-                
-        convolution *= dt
-        
-        return convolution
-
-    
-    def convolve_continuous2(self, t, I, mode='fft'):
-        
-        # Given a 1d-array t and an nd-array I with I.shape=(len(t),...) returns convolution,
-        # the convolution of the kernel with axis 0 of I for all other axis values
-        # so that convolution.shape = I.shape
-        
-        dt = get_dt(t)
-
-        arg0 = int(self.support[0] / dt)
-        argf = int(np.ceil(self.support[1] / dt))
-
-        t_support = np.arange(arg0, argf + 1, 1) * dt
-
-        convolution = np.zeros(I.shape)
-        
-        if mode == 'fft':
-            
-            t_shape = (len(t_support), ) + tuple([1] * (I.ndim-1))
-            kernel_values = self.interpolate(t_support).reshape(t_shape)
-            full_convolution = fftconvolve(kernel_values, I, mode='full')
-            # ME COSTO UN HUEVO LOGRAR LAS DOS LINEAS A CONTINUACION Y PARECE FUNCIONAR. NO TOCAR
-#            print(arg0, argf)
-
-            if arg0 < 0 and argf > 0 and arg0 + argf - 1 >= 0:
-                convolution[arg0 + argf - 1:, ...] = full_convolution[argf - 1:len(t) - arg0, ...]
-            elif arg0 >= 0 and argf > 0:
-                convolution[arg0:, ...] = full_convolution[:len(t) - arg0, ...]
-            elif arg0 < 0:
-                #convolution[:len(t) + argf - 1, ...] = full_convolution[-argf + 1:len(t), ...]
-                convolution[:len(t) + arg0 + 1, ...] = full_convolution[-arg0:len(t) + 1, ...]
-            else:
-                return None
-            # NO TOCAR A MENOS QUE ESTE MUY SEGURO
-        
-         #elif mode == 'direct':
-        #
-        #     convolution[0] = 0.
-        #
-        #     for i in range(len(t)-1):
-        #
-        #         if i<argmax:
-        #             convolution[i+1] = np.sum( self.interpolate(t[:i+1]) * I[i::-1] ) # doesn't include i+1
-        #             #convolution[i+1] = np.sum( self.interpolate(t[:i+2]) * I[i+1::-1] ) # includes i+1
-        #
-        #         elif i>=argmax:
-        #             convolution[i+1] = np.sum( self.interpolate(t[:argmax]) * I[i:i-argmax:-1] ) # doesn't include i+1
-        #             #convolution[i+1] = np.sum( self.interpolate(t[:argmax]) * I[i+1:i+1-argmax:-1] ) # includes i+1
                 
         convolution *= dt
         
@@ -291,7 +235,7 @@ class KernelRect(Kernel):
 
         return X
     
-    def deconvolve_continuous(self, t, I, v, method='fft', mask=None, R2=False, rmse=False):
+    def deconvolve_continuous(self, t, I, v, method='fft', mask=None):
         
         if mask is None:
             mask = np.ones(I.shape, dtype = bool)
@@ -300,15 +244,7 @@ class KernelRect(Kernel):
         X = X[mask,:]
         v = v[mask]
         
-        self.coefs = solve_Xtheta_y(X, v, R2=False)
-        
-        if rmse:
-            R2_ = estimate_R2(v, np.dot(X, self.coefs))
-            rmse_ = estimate_rmse(v, np.dot(X, self.coefs))
-            return R2_, rmse_
-        
-        if R2:
-            return R2_
+        self.coefs = np.linalg.solve(X, v)
    
     def convolve_basis_discrete(self, t, s, shape=None):
     

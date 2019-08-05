@@ -32,7 +32,8 @@ class GLMDecoder:
         self.I = None
         self.I_dec = None
         self.tau = tau  # saved
-        self.Ih = Ih  # saved
+        if Ih is None:
+            self.Ih = [0] * self.n_neurons  # saved
         self.Imu = Imu  # saved
         self.Isd = Isd  # saved
 

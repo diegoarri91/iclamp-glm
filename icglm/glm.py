@@ -1,8 +1,8 @@
 import numpy as np
 
-from fun_signals import get_dt, shift_array
-
 from .kernels import KernelFun
+from .masks import shift_mask
+from .signals import get_dt
 
 
 class GLM:
