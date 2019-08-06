@@ -35,6 +35,3 @@ glm_fit.plot_raster()
 <p align="center">
   <img src=examples/raster_plot.png>
 </p>
-
-## Documenation
-* **[holi](/doc/)**
