@@ -5,7 +5,8 @@ from scipy.linalg import solveh_banded, cholesky_banded, cho_solve_banded, solve
 import time
 
 from .kernels import KernelVals
-from .signals import get_arg, get_dt, diag_indices
+from .signals import get_arg, get_dt, diag_indices, searchsorted
+from .spiketrain import SpikeTrain
 
 
 class GLMDecoder:
@@ -419,6 +420,44 @@ class GLMDecoder:
                                               #transform=ax_time_rescale_transform[0].transAxes)
 
         return fig, (axI, axr, ax_log_posterior)
+
+    def plot_decoded_stimulus(self, t0=None, tf=None):
+
+        t0 = t0 if t0 is not None else self.t[0]
+        tf = tf if tf is not None else self.t[-1] + self.dt
+
+        arg0, argf = searchsorted(self.t, [t0, tf])
+
+        fig = plt.figure(figsize=(12, 4.5))
+        r = 7
+        axI = plt.subplot2grid((10, 1), (10 - r, 0), rowspan=r)
+        ax_raster = plt.subplot2grid((10, 1), (0, 0), rowspan=10 - r, sharex=axI)
+
+        axI.plot(self.t[arg0:argf], self.I_true[arg0:argf], color='C0', lw=1, zorder=1)
+        axI.plot(self.t[arg0:argf], self.I_dec[arg0:argf], color='C1', lw=2, zorder=1)
+
+        for n in range(self.n_neurons):
+            st = SpikeTrain(self.t[arg0:argf], self.mask_spk[n][arg0:argf])
+            st.plot(ax=ax_raster, color='C' + str(n % 10))
+
+        if self.var_I_dec is not None:
+            sd = np.sqrt(self.var_I_dec)[arg0:argf]
+            axI.fill_between(self.t[arg0:argf], self.I_dec[arg0:argf] - sd, self.I_dec[arg0:argf] + sd, color='C1', alpha=.4, zorder=2)
+
+        ax_raster.xaxis.set_visible(False)
+        ax_raster.yaxis.set_visible(False)
+        ax_raster.spines['bottom'].set_visible(False)
+        ax_raster.spines['top'].set_visible(False)
+        ax_raster.spines['left'].set_visible(False)
+        ax_raster.spines['right'].set_visible(False)
+        ax_raster.set_ylabel('data')
+        axI.spines['top'].set_visible(False)
+        axI.spines['right'].set_visible(False)
+        axI.set_xlabel('time')
+        axI.set_ylabel('stim')
+
+        return fig, (ax_raster, axI)
+
     
     def save_pdf(self, folder, pdf_name, off=True):
         

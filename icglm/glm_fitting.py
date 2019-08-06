@@ -123,7 +123,19 @@ class GLMFitter:
             glm_fitter = cls(ic)
         
         return glm_fitter
-    
+
+    @property
+    def t(self):
+        return self.ic.t
+
+    @property
+    def data(self):
+        return self.ic.data
+
+    @property
+    def stim(self):
+        return self.ic.stim
+
     @classmethod
     def from_IClamp(cls, folder, filename, tf=None):
         ic = IClamp.from_file(folder, filename)
@@ -517,8 +529,10 @@ class GLMFitter:
 
         if axs is None:
             fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(9, 4), ncols=2)
-            ax_kappa.set_xlabel('time'); ax_kappa.set_ylabel('kappa')
-            ax_eta.set_xlabel('time'); ax_eta.set_ylabel('eta')
+            ax_kappa.set_xlabel('time'); #ax_kappa.set_ylabel('$\kappa$')
+            ax_kappa.set_ylabel('stim filter')
+            ax_eta.set_xlabel('time'); #ax_eta.set_ylabel('$\eta$')
+            ax_eta.set_ylabel('post-spike filter')
             ax_kappa.spines['right'].set_visible(False)
             ax_kappa.spines['top'].set_visible(False)
             ax_eta.spines['right'].set_visible(False)
