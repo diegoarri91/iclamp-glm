@@ -516,7 +516,7 @@ class GLMFitter:
     def plot_filters(self, axs=None):
 
         if axs is None:
-            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(12, 6.5), ncols=2)
+            fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(9, 4), ncols=2)
             ax_kappa.set_xlabel('time'); ax_kappa.set_ylabel('kappa')
             ax_eta.set_xlabel('time'); ax_eta.set_ylabel('eta')
             ax_kappa.spines['right'].set_visible(False)
@@ -692,13 +692,19 @@ class GLMFitter:
         axs[0].xaxis.set_visible(False)
         axs[0].set_yticks([])
         axs[0].spines['left'].set_visible(False)
+        axs[0].spines['right'].set_visible(False)
         axs[0].spines['bottom'].set_visible(False)
+        axs[0].spines['top'].set_visible(False)
         axs[0].set_ylabel('data')
         axs[1].xaxis.set_visible(False)
         axs[1].set_yticks([])
         axs[1].spines['left'].set_visible(False)
+        axs[1].spines['right'].set_visible(False)
         axs[1].spines['bottom'].set_visible(False)
+        axs[1].spines['top'].set_visible(False)
         axs[1].set_ylabel('GLM')
+        axs[2].spines['top'].set_visible(False)
+        axs[2].spines['right'].set_visible(False)
         axs[2].set_xlabel('time')
 
         return fig, axs

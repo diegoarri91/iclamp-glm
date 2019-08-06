@@ -4,6 +4,7 @@ iclamp-glm is a Python module for the analysis of electrophysiological patch cla
 ## Example
 ### Loading and preprocessing patch clamp data
 ```python
+import numpy as np
 from icglm.iclamp import IClamp
 ic = IClamp.load_from_abf(path='./18o03049.abf') # load 9 repetitions of voltage response to noisy stimulation
 ic = ic.subtract_Ih(th=1000.1).restrict(t0=1000.1, tf=11000.1) # subtract holding current and restrict data
@@ -13,12 +14,12 @@ ic.plot(sweeps=[0]) # plot first sweep
   <img src=/examples/ic_plot.png>
 </p>
 
-### Simulating GLM spike train
+### Fitting GLM to data
 ```python
 from icglm.glm_fitting import GLMFitter
 glm_fit = GLMFitter(ic).set_mask_spikes(thr=-13).subsample(10) # find spikes and subsample signal
-tbins_kappa = np.arange(0., 220, 5.) # define time bins for stimulus filter
-tbins_eta = np.arange(0., 475., 10.) # define time bins for post-spike filter
+tbins_kappa = np.arange(0, 220, 5) # define time bins for stimulus filter
+tbins_eta = np.arange(0, 480, 10) # define time bins for post-spike filter
 glm_fit.fit(tbins_kappa=tbins_kappa, tbins_eta=tbins_eta)
 glm_fit.plot_filters()
 ```
@@ -28,6 +29,7 @@ glm_fit.plot_filters()
 </p>
 
 ```python
+from icglm.kernels import KernelFun
 glm_fit.set_mask_spikes_model(trials=9)
 glm_fit.psth(psth_kernel=KernelFun.gaussian_delta(delta=40))
 glm_fit.plot_raster()
