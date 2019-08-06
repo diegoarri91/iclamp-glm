@@ -1,4 +1,5 @@
 # iclamp-glm
+iclamp-glm is a Python module for the analysis of electrophysiological patch clamp data by using encoding and decoding neural models. It is built on top of SciPy.
 
 ## Example
 ### Loading and preprocessing patch clamp data
