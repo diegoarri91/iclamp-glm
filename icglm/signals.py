@@ -11,23 +11,6 @@ def diag_indices(n, k=0):
     else:
         return rows, cols
 
-def get_arg(t, dt, t0=0):
-    """
-    Given t float, list or np.array returns argument of corresponding t values using dt
-    """
-    
-    if 'float' in str(type(t))  or type(t) is int:
-        return int(np.round((t - t0) / dt , 0))
-    
-    elif type(t) is list:
-        return np.array(np.round((np.array(t) - t0) / dt ,0), dtype=int)
-    
-    elif type(t) is np.ndarray:
-        return np.array(np.round((t - t0) / dt ,0), dtype=int)
-    
-    else:
-        raise
-        
 def get_dt(t):
     argf = 20 if len(t) >= 20 else len(t)
     dt = np.mean(np.diff(t[:argf]))
@@ -112,3 +95,19 @@ def threshold_crossings(signal, threshold, upcrossing=True):
         mask_lower = shift_mask(mask_lower, -1, fill_value=False)
 
     return mask_lower & mask_greater
+
+def unband_matrix(banded_matrix, symmetric=True):
+    """
+    Assumes banded_matrix.shape=(n_diags, lent). banded_matrix=[diag0, diag1, diag2, ....]. See scipy format
+    :param banded_matrix:
+    :return:
+    """
+    N = banded_matrix.shape[1]
+    unbanded_matrix = np.zeros((N, N))
+    for diag in range(banded_matrix.shape[0]):
+        indices = diag_indices(N, k=diag)
+        unbanded_matrix[indices] = banded_matrix[diag, :N - diag]
+    if symmetric:
+        indices = np.tril_indices(N)
+        unbanded_matrix[indices] = unbanded_matrix.T[indices]
+    return unbanded_matrix

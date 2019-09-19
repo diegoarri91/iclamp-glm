@@ -2,15 +2,16 @@ import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .abf import load_data, load_protocol
+from utils.abf import load_data, load_protocol
 from .masks import extend_trues, shift_mask
-from .signals import get_arg, get_dt, searchsorted, mask_extrema, threshold_crossings
+from .signals import get_dt, searchsorted, mask_extrema, threshold_crossings
+from .utils.time import get_arg
 from .spiketrain import SpikeTrain
 
 
 class IClamp:
 
-    def __init__(self, t=None, data=None, stim=None, path=None, file=None, neuron=None):
+    def __init__(self, t=None, data=None, stim=None, mask_spikes=None, path=None, file=None, neuron=None):
 
         if len(t) != data.shape[0] or len(t) != stim.shape[0]:
             raise
@@ -21,14 +22,15 @@ class IClamp:
         self.t = t
         self.data = data
         self.stim = stim
+        self.mask_spikes = mask_spikes
 
         self.path = path
         self.file = file
         self.neuron = neuron
 
-    def new(self, t, data, stim):
-        metadata = {key: val for key, val in vars(self).items() if key not in ['t', 'data', 'stim']}
-        return self.__class__(t=t, data=data, stim=stim, **metadata)
+    def new(self, t, data, stim, mask_spikes=None):
+        metadata = {key: val for key, val in vars(self).items() if key not in ['t', 'data', 'stim', 'mask_spikes']}
+        return self.__class__(t=t, data=data, stim=stim, mask_spikes=mask_spikes, **metadata)
 
     @property
     def v(self):
@@ -65,13 +67,17 @@ class IClamp:
         return epd
 
     def sweeps(self, sweeps):
-        return self.new(self.t, self.data[:, sweeps], self.stim[:, sweeps])
+        if self.mask_spikes is not None:
+            mask_spikes = self.mask_spikes[:, sweeps]
+        else:
+            mask_spikes = None
+        return self.new(self.t, self.data[:, sweeps], self.stim[:, sweeps], mask_spikes=mask_spikes)
 
-    def plot(self, axv=None, axstim=None, mask_spikes_kwargs={}, **kwargs):
+    def plot(self, axv=None, axstim=None, spikes=False, **kwargs):
 
         sweeps = kwargs.get('sweeps', np.arange(self.nsweeps))
         sweeps = np.array(sweeps)
-        spikes = kwargs.get('spikes', False)
+        lw = kwargs.get('lw', 1)
 
         if axv is None:
             fig = plt.figure(figsize=(12, 5))
@@ -88,17 +94,58 @@ class IClamp:
             axstim.spines['right'].set_visible(False)
             axstim.set_xlabel('time')
             axstim.set_ylabel('stim')
+        else:
+            fig = None
 
-        mask_spike = self.mask_spikes(**mask_spikes_kwargs)
-
-        axv.plot(self.t, self.v[:, sweeps])
-        axstim.plot(self.t, self.stim[:, sweeps])
+        axv.plot(self.t, self.v[:, sweeps], lw=lw)
+        axstim.plot(self.t, self.stim[:, sweeps], lw=lw)
 
         if spikes:
+            mask_spikes = self.mask_spikes
             for sw in sweeps:
-                axv.plot(self.t[mask_spike[:, sw]], self.data[mask_spike[:, sw], sw], 'o', lw=.7)
+                axv.plot(self.t[mask_spikes[:, sw]], self.data[mask_spikes[:, sw], sw], 'o', lw=.7)
+
 
         return fig, (axv, axstim)
+
+    def plot_raster(self, ax=None, **kwargs):
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(12, 7), nrows=1)
+        else:
+            fig = None
+
+        st= SpikeTrain(self.t, self.mask_spikes)
+
+        st.plot(ax=ax, color='dodgerblue', **kwargs)
+
+        ax.set_yticks([])
+        ax.spines['left'].set_visible(False)
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        ax.set_xlabel('time')
+
+        return fig, ax
+
+    def plot_psth(self, ax=None, kernel=None, lw=1):
+
+        if ax is None:
+            fig, ax = plt.subplots(figsize=(12, 7), nrows=1)
+        else:
+            fig = None
+
+        st= SpikeTrain(self.t, self.mask_spikes)
+        psth = st.get_PSTH(kernel)
+
+        ax.plot(self.t, psth, color='dodgerblue', lw=lw)
+
+        # ax.set_yticks([])
+        # ax.spines['left'].set_visible(False)
+        # ax.spines['right'].set_visible(False)
+        # ax.spines['top'].set_visible(False)
+        ax.set_xlabel('time')
+
+        return fig, ax
 
     def restrict(self, t0=None, tf=None, reset_time=True):
         
@@ -109,47 +156,78 @@ class IClamp:
         t = self.t[arg0:argf]
         data = self.data[arg0:argf]
         stim = self.stim[arg0:argf]
+        if self.mask_spikes is not None:
+            mask_spikes = self.mask_spikes[arg0:argf]
+        else:
+            mask_spikes = None
 
         if reset_time:
             t = t - t[0]
 
-        return self.new(t, data, stim)
+        return self.new(t, data, stim, mask_spikes=mask_spikes)
 
-    def subsample(self, dt=None, n_sample=None):
+    def subsample(self, dt, average_stim=False):
+        # FIRST set_mask_spikes should be called so mask_spikes should be set without subsampling!
+        n_sample = get_arg(dt, self.dt)
 
-        if not (dt is None):
-            n_sample = get_arg(dt, self.dt)
+        if average_stim:
+            bins = np.arange(0, len(self.t) + n_sample, n_sample)
+            bins[-1] = len(self.t)
+            stim = np.array([np.mean(self.stim[bins[ii]:bins[ii + 1]], 0) for ii in range(len(bins) - 1)])
+            t = self.t[::n_sample]
+            data = self.data[::n_sample]
+        else:
+            t = self.t[::n_sample]
+            data = self.data[::n_sample]
+            stim = self.stim[::n_sample]
+        
+        if self.mask_spikes is not None:
+            arg_spikes = np.where(self.mask_spikes)
+            arg_spikes = (np.array(np.floor(arg_spikes[0]/n_sample), dtype=int), ) + arg_spikes[1:]
+            mask_spikes = np.zeros(data.shape, dtype=bool)
+            mask_spikes[arg_spikes] = True
+        else:
+            mask_spikes = None
+        
+        return self.new(t, data, stim, mask_spikes=mask_spikes)
+    
+    def get_Ih(self, th=200):
 
-        t = self.t[::n_sample]
-        data = self.data[::n_sample]
-        stim = self.stim[::n_sample]
+        argh = searchsorted(self.t, th)
+        Ih = np.mean(self.stim[:argh, ...], 0)
 
-        return self.new(t, data, stim)
+        return Ih
+
+    def subtract_Ih(self, th=200):
+
+        Ih = self.get_Ih(th)
+
+        return self.new(self.t, self.data, self.stim - Ih, mask_spikes=self.mask_spikes)
 
     # =============================================================================
     # Spikes methods
     # =============================================================================
 
-    def mask_spikes(self, t0=None, tf=None, thr=-13., time_window=3,
+    def set_mask_spikes(self, t0=None, tf=None, thr=-13., time_window=3,
+                    use_derivative=False, dvdt_threshold=9, t_before_spike_peak=0, tref=4):
+        
+        self.mask_spikes = self.get_mask_spikes(t0=t0, tf=tf, thr=thr, time_window=time_window,
+                    use_derivative=use_derivative, dvdt_threshold=dvdt_threshold, t_before_spike_peak=t_before_spike_peak, tref=tref)
+        
+        return self
+    
+    def get_mask_spikes(self, t0=None, tf=None, thr=-13, time_window=3,
                     use_derivative=False, dvdt_threshold=9, t_before_spike_peak=0, tref=4):
         # 24/09/2018
         # updated 23/04/2019 to tref and so it's equal to GLMFitter
 
-        if t0 is None:
-            t0 = self.t[0]
+        t0 = t0 if t0 is not None else self.t[0]
+        tf = tf if tf is not None else self.t[-1] + self.dt
+        arg0, argf = searchsorted(self.t, [t0, tf])
 
-        if tf is None:
-            tf = self.t[-1] + self.dt
-
-        arg0, argf = get_arg([t0, tf], self.dt)
         arg_order = get_arg(time_window, self.dt)
         arg_before_spk = get_arg(t_before_spike_peak, self.dt)
         argref = get_arg(tref, self.dt)
-
-        mask0 = np.zeros(self.shape, dtype=bool)
-        maskf = np.zeros(self.shape, dtype=bool)
-        mask0[arg0:, ...] = True
-        maskf[:argf, ...] = True
 
         mask_spk_peak = self.data > thr
         mask_spk_peak = mask_extrema(self.data, mask_data=mask_spk_peak, order=arg_order, left_comparator=np.greater,
@@ -176,37 +254,44 @@ class IClamp:
             # there can be no two spikes separated by less than tref. I give back the first
             mask_spk = mask_spk & ~extend_trues(shift_mask(mask_spk, 1, fill_value=False), 0, argref)
 
-        return mask_spk & mask0 & maskf
+        mask_spk[:arg0] = False
+        mask_spk[argf:] = False
 
-    def mask_away_from_spikes(self, tl, tr, t0=0, tf=None, mask_spikes_kwargs={}):
+        return mask_spk
 
-        if tf is None:
-            tf = self.t[-1] + self.dt
+    def get_mask_away_from_spikes(self, tl, tr, t0=None, tf=None, mask_spikes_kwargs=None):
+
+        t0 = t0 if t0 is not None else self.t[0]
+        tf = tf if tf is not None else self.t[-1] + self.dt
 
         arg0, argf = searchsorted(self.t, [t0, tf])
         argl, argr = get_arg([tl, tr], self.dt)
 
-        mask = ~extend_trues(self.mask_spikes(**mask_spikes_kwargs), argl, argr)
+        if self.mask_spikes is not None:
+            mask = ~extend_trues(self.mask_spikes, argl, argr)
+        else:
+            mask = ~extend_trues(self.get_mask_spikes(**mask_spikes_kwargs), argl, argr)
+
         mask[:arg0] = False
         mask[argf:] = False
 
         return mask
 
-    def get_SpikeTrain(self, **kwargs):
-        return SpikeTrain(self.t, self.mask_spikes(**kwargs))
+    def get_SpikeTrain(self):
+        return SpikeTrain(self.t, self.mask_spikes)
 
     @property
     def spiking_sweeps(self):
-        mask_spk = self.mask_spikes()
+        mask_spk = self.get_mask_spikes()
         return np.where(np.any(mask_spk, 0))[0]
 
     @property
     def non_spiking_sweeps(self):
-        mask_spk = self.mask_spikes()
+        mask_spk = self.get_mask_spikes()
         return np.where(~np.any(mask_spk, 0))[0]
 
     def mask_spiking_sweeps(self):
-        mask_spk = self.mask_spikes()
+        mask_spk = self.get_mask_spikes()
         return np.any(mask_spk, 0)
 
     def get_spike_count(self, time_bins, average_sweeps=False, mask_spikes_kwargs=None):
@@ -221,7 +306,7 @@ class IClamp:
 
         spk_count = np.zeros((len(arg_bins) - 1, self.nsweeps))
 
-        mask_spk = self.mask_spikes(**mask_spikes_kwargs)
+        mask_spk = self.get_mask_spikes(**mask_spikes_kwargs)
 
         for sw in range(self.nsweeps):
             arg_spk = np.where(mask_spk[:, sw])[0]
@@ -255,8 +340,8 @@ class IClamp:
 
         return np.var(spk_count, 1) / np.mean(spk_count, 1)
 
-    def get_PSTH(self, kernel, average_sweeps=True, mask_spikes_kwargs={}):
-        psth = self.get_SpikeTrain(**mask_spikes_kwargs).get_PSTH(kernel, average_sweeps=average_sweeps)
+    def get_PSTH(self, kernel, average_sweeps=True):
+        psth = self.get_SpikeTrain().get_PSTH(kernel, average_sweeps=average_sweeps)
         return psth
 
     def get_ISI_distribution(self, mask_spikes_kwargs={}):
@@ -264,7 +349,7 @@ class IClamp:
 
         isi_dist = []
 
-        mask_spk = self.mask_spikes(**mask_spikes_kwargs)
+        mask_spk = self.get_mask_spikes(**mask_spikes_kwargs)
 
         for sw in range(self.nsweeps):
             t_spk = self.t[mask_spk[:, sw]]
@@ -295,19 +380,6 @@ class IClamp:
     # =============================================================================
     #
     # =============================================================================
-
-    def get_Ih(self, th=200):
-
-        argh = searchsorted(self.t, th)
-        Ih = np.mean(self.stim[:argh, ...], 0)
-
-        return Ih
-
-    def subtract_Ih(self, th=200):
-
-        Ih = self.get_Ih(th)
-
-        return self.new(self.t, self.data, self.stim - Ih)
 
     def get_vhIh(self, th=200., argh=None):
         """
@@ -341,7 +413,7 @@ class IClamp:
 
         arg_ref = get_arg(tref, self.dt)
 
-        mask_spk = self.mask_spikes(t0=t0, tf=tf)
+        mask_spk = self.get_mask_spikes(t0=t0, tf=tf)
         arg_spk = np.where(mask_spk)
 
         arg_spike_ref = (arg_spk[0] + arg_ref, arg_spk[1])
@@ -360,3 +432,7 @@ class IClamp:
         vr = np.mean(self.v[mask_vr])
         return vr
 
+
+class HoldNoise(IClamp):
+    
+    pass

@@ -2,14 +2,24 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import fftconvolve, convolve
 
-from .signals import get_dt, searchsorted
+from .signals import diag_indices, get_dt, searchsorted
 
 class Kernel:
+
+    def __init__(self, prior=None, prior_pars=None):
+        self.prior = prior
+        self.prior_pars = np.array(prior_pars)
+        self.fix_values = False
+        self.values = None
 
     def interpolate(self, t):
         pass
 
-    def plot(self, t=None, ax=None, **kwargs):
+    # def get_KernelValues(self, t):
+    #     kernel_values = self.interpolate(t)
+    #     return KernelValues(values=kernel_values, support=self.support)
+
+    def plot(self, t=None, ax=None, invert_t=False, invert_values=False, **kwargs):
 
         if t is None:
             dt = .1
@@ -20,6 +30,10 @@ class Kernel:
             fig, ax = plt.subplots(figsize = figsize)
 
         y = self.interpolate(t)
+        if invert_t:
+            t = -t
+        if invert_values:
+            y = -y
         ax.plot(t, y, **kwargs)
 
         return ax
@@ -42,16 +56,23 @@ class Kernel:
         axs[2].set_xscale('log'); axs[2].set_yscale('log')
         
         return axs
-    
-    def set_values(self, dt, ndim):
+
+    def set_values(self, dt):
         arg0 = int(self.support[0] / dt)
         argf = int(np.ceil(self.support[1] / dt))
-
         t_support = np.arange(arg0, argf + 1, 1) * dt
-        t_shape = (len(t_support), ) + tuple([1] * (ndim-1))
-        self.values = self.interpolate(t_support).reshape(t_shape)
+        self.values = self.interpolate(t_support)
+        return self
+
+    # def set_values(self, dt, ndim):
+    #     arg0 = int(self.support[0] / dt)
+    #     argf = int(np.ceil(self.support[1] / dt))
+    #
+    #     t_support = np.arange(arg0, argf + 1, 1) * dt
+    #     t_shape = (len(t_support), ) + tuple([1] * (ndim-1))
+    #     self.values = self.interpolate(t_support).reshape(t_shape)
     
-    def convolve_continuous(self, t, I, mode='fft', iterating=False):
+    def convolve_continuous(self, t, I, mode='fft'):
         
         # Given a 1d-array t and an nd-array I with I.shape=(len(t),...) returns convolution,
         # the convolution of the kernel with axis 0 of I for all other axis values
@@ -62,8 +83,7 @@ class Kernel:
         arg0 = int(self.support[0] / dt)
         argf = int(np.ceil(self.support[1] / dt))
 
-        if iterating or 'KernelVals' in str(self.__class__):
-            # need previous setting of self.values using self.set_values()
+        if isinstance(self, KernelValues):
             kernel_values = self.values
         else:
             t_support = np.arange(arg0, argf + 1, 1) * dt
@@ -95,8 +115,8 @@ class Kernel:
         
         return convolution
 
-    def correlate_continuous(self, t, I, mode='fft', iterating=False):
-        return self.convolve_continuous(t, I[::-1], mode=mode, iterating=iterating)[::-1]
+    def correlate_continuous(self, t, I, mode='fft'):
+        return self.convolve_continuous(t, I[::-1], mode=mode)[::-1]
 
     def convolve_discrete(self, t, s, A=None, shape=None):
         
@@ -165,11 +185,13 @@ class KernelFun(Kernel):
 
 class KernelRect(Kernel):
     
-    def __init__(self, tbins, coefs=None):
+    def __init__(self, tbins, coefs=None, prior=None, prior_pars=None):
         self.nbasis = len(tbins) - 1
         self.tbins = np.array(tbins)
         self.support = np.array([tbins[0], tbins[-1]])
         self.coefs = np.array(coefs)
+        self.prior = prior
+        self.prior_pars = np.array(prior_pars)
         
     def interpolate(self, t):
 
@@ -198,12 +220,21 @@ class KernelRect(Kernel):
             ax.plot(t, vals, linewidth = 5. - 4.*k/(len(arg_bins)-1.) )
 
         return ax
+
+    def copy(self):
+        kernel = KernelRect(self.tbins.copy(), coefs=self.coefs.copy(), prior=self.prior, prior_pars=self.prior_pars.copy())
+        return kernel
     
     @classmethod
     def kistler_kernels(cls, delta, dt):
         kernel1 = cls(np.array([-delta, delta + dt]), [1.])
         kernel2 = cls(np.array([0., dt]), [1./dt])
         return kernel1, kernel2
+    
+    @classmethod
+    def exponential(cls, tf=None, dt=None, tau=None, A=None):
+        tbins = np.arange(0, tf, dt)
+        return cls(tbins, coefs=A * np.exp(-tbins[:-1] / tau))
     
     ########################################################################
     # DECONVOLVE CONTINUOUS SIGNAL
@@ -270,8 +301,60 @@ class KernelRect(Kernel):
                 X[indices] += 1.
         
         return X
+
+    def gh_log_prior(self, coefs):
+
+        if self.prior == 'exponential':
+            lam, mu = self.prior_pars[0], np.exp(-self.prior_pars[1] * np.diff(self.tbins[:-1]))
+
+            log_prior = -lam * np.sum((coefs[1:] - mu * coefs[:-1]) ** 2)
+
+            g_log_prior = np.zeros(len(coefs))
+
+            g_log_prior[1] = -2 * lam * mu[0] * (coefs[1] - mu[0] * coefs[0])
+            g_log_prior[2:-1] = 2 * lam * (-mu[:-1] * coefs[:-2] + (1 + mu[1:] ** 2) * coefs[1:-1] - mu[1:] * coefs[2:])
+            g_log_prior[-1] = 2 * lam * (coefs[-1] - mu[-1] * coefs[-2])
+            g_log_prior = -g_log_prior
+
+            h_log_prior = np.zeros((len(coefs), len(coefs)))
+
+            h_log_prior[1, 1], h_log_prior[1, 2] = mu[0] ** 2, -mu[0]
+            h_log_prior[2:-1, 2:-1][diag_indices(len(coefs) - 2, k=0)] = 1 + mu[1:] ** 2
+            h_log_prior[2:-1, 2:-1][diag_indices(len(coefs) - 2, k=1)] = -mu[1:-1]
+            h_log_prior[-1, -1] = 1
+            h_log_prior = -2 * lam * h_log_prior
+
+            h_log_prior[np.tril_indices_from(h_log_prior, k=-1)] = h_log_prior.T[
+                np.tril_indices_from(h_log_prior, k=-1)]
+
+        elif self.prior == 'smooth_2nd_derivative':
+
+            lam = self.prior_pars[0]
+
+            log_prior = -lam * np.sum((coefs[:-2] + coefs[2:] - 2 * coefs[1:-1]) ** 2)
+
+            g_log_prior = np.zeros(len(coefs))
+            g_log_prior[0] = -2 * lam * (coefs[0] - 2 * coefs[1] + coefs[2])
+            g_log_prior[1] = -2 * lam * (-2 * coefs[0] + 5 * coefs[1] - 4 * coefs[2] + coefs[3])
+            g_log_prior[2:-2] = -2 * lam * (coefs[:-4] - 4 * coefs[1:-3] + 6 * coefs[2:-2] - 4 * coefs[3:-1] + coefs[4:])
+            g_log_prior[-2] = -2 * lam * (coefs[-4] - 4 * coefs[-3] + 5 * coefs[-2] - 2 * coefs[-1])
+            g_log_prior[-1] = -2 * lam * (coefs[-3] - 2 * coefs[-2] + coefs[-1])
+
+            h_log_prior = np.zeros((len(coefs), len(coefs)))
+            h_log_prior[0, 0], h_log_prior[0, 1], h_log_prior[0, 2] = 1, -2, 1
+            h_log_prior[1, 1], h_log_prior[1, 2], h_log_prior[1, 3] = 5, -4, 1
+            h_log_prior[2:-2, 2:-2][diag_indices(len(coefs) - 4, k=0)] = 6
+            h_log_prior[2:-2, 2:-2][diag_indices(len(coefs) - 4, k=1)] = -4
+            h_log_prior[2:-2, 2:-2][diag_indices(len(coefs) - 4, k=2)] = 1
+            h_log_prior[-2, -2], h_log_prior[-2, -1] = 5, -2
+            h_log_prior[-1, -1] = 1
+            h_log_prior = - 2 * lam * h_log_prior
+            h_log_prior[np.tril_indices_from(h_log_prior, k=-1)] = h_log_prior.T[
+                np.tril_indices_from(h_log_prior, k=-1)]
+
+        return log_prior, g_log_prior, h_log_prior
     
-class KernelVals(Kernel):
+class KernelValues(Kernel):
 
     def __init__(self, values=None, support=None):
         self.values = values

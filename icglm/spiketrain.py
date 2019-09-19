@@ -3,7 +3,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .signals import get_arg, get_dt
+from .signals import get_dt
+from .utils.time import get_arg
 
 
 class SpikeTrain:
@@ -139,7 +140,7 @@ class SpikeTrain:
     def convolve(self, kernel):
         return kernel.convolve_continuous(self.t, self.mask / self.dt)
 
-    def get_PSTH(self, kernel, average_sweeps=True):
+    def get_psth(self, kernel, average_sweeps=True):
 
         if average_sweeps:
             average_spike_train = self.average_spike_train()

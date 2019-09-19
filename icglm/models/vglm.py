@@ -1,0 +1,172 @@
+import numpy as np
+
+from .base import BayesianSpikingModel
+from .srm import SRM
+from masks import shift_mask
+from signals import get_dt
+
+
+class VGLM(BayesianSpikingModel, SRM):
+
+    def __init__(self, kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None, lam=None):
+        self.vr = vr
+        self.kappa = kappa
+        self.eta = eta
+
+        self.gamma = gamma
+        self.vt = vt
+        self.dv = dv
+        self.lam = lam
+
+    def copy(self):
+        return self.__class__(u0=self.vr, kappa=self.kappa.copy(), eta=self.eta.copy(), gamma=self.gamma.copy(), vt=self.vt, dv=self.dv)
+
+    # def sample(self, t, stim, stim_h=0, full=False):
+    #
+    #     dt = get_dt(t)
+    #
+    #     if stim.ndim == 1:
+    #         shape = (len(t), 1)
+    #         stim = stim.reshape(len(t), 1)
+    #     else:
+    #         shape = stim.shape
+    #
+    #     v = np.zeros(shape) * np.nan
+    #     r = np.zeros(shape) * np.nan
+    #     eta_conv = np.zeros(shape)
+    #     gamma_conv = np.zeros(shape)
+    #     mask_spk = np.zeros(shape, dtype=bool)
+    #
+    #     kappa_conv = self.kappa.convolve_continuous(t, stim - stim_h) + stim_h * self.kappa.area(dt=dt)
+    #
+    #     j = 0
+    #     while j < len(t):
+    #
+    #         v[j, ...] = kappa_conv[j, ...] - eta_conv[j, ...] + self.vr
+    #         r[j, ...] = np.exp((v[j, ...] - self.vt - gamma_conv[j, ...]) / self.dv)
+    #
+    #         p_spk = 1. - np.exp(-r[j, ...] * dt)
+    #         aux = np.random.rand(*shape[1:])
+    #
+    #         mask_spk[j, ...] = p_spk > aux
+    #
+    #         if np.any(mask_spk[j, ...]) and j < len(t) - 1:
+    #             eta_conv[j + 1:, mask_spk[j, ...]] += self.eta.interpolate(t[j + 1:] - t[j + 1])[:, None]
+    #             gamma_conv[j + 1:, mask_spk[j, ...]] += self.gamma.interpolate(t[j + 1:] - t[j + 1])[:, None]
+    #
+    #         j += 1
+    #
+    #     if full:
+    #         # TODO. DEFINE WHAT THIS SHOULD RETURN
+    #         return r, mask_spk
+    #     else:
+    #         return v, r, mask_spk
+
+    # def set_params(self, theta):
+    #     n_kappa = self.kappa.nbasis
+    #     n_eta = self.eta.nbasis
+    #     self.vr = theta[0]
+    #     self.kappa.coefs = theta[1:n_kappa + 1]
+    #     self.eta.coefs = theta[n_kappa + 1:n_kappa + 1 + n_eta]
+    #     self.vt = theta[n_kappa + 1 + n_eta] / theta[-1]
+    #     self.gamma.coefs = theta[n_kappa + 2 + n_eta:-1] / theta[-1]
+    #     self.dv = 1 / theta[-1]
+    #     return self
+
+    def gh_log_likelihood_kernels(self, theta, data_sub, dt, X_spikes, X_sub, X, Y_spikes, Y):
+
+        n_kappa = self.kappa.nbasis
+        n_eta = self.eta.nbasis
+        n_gamma = self.gamma.nbasis
+        n_sub = 1 + n_kappa + n_eta
+        a = theta[-1]
+        # a, lam = 1, 1
+
+        Xsub_theta_data = X_sub @ theta[:1 + n_kappa + n_eta] - data_sub
+        Xspk_theta = np.dot(X_spikes, theta[:1 + n_kappa + n_eta])
+        Yspk_theta = np.dot(Y_spikes, theta[1 + n_kappa + n_eta: -1])
+        X_theta = np.dot(X, theta[:1 + n_kappa + n_eta])
+        Y_theta = np.dot(Y, theta[1 + n_kappa + n_eta: -1])
+        exp_X_theta_Y_phi = np.exp(a * X_theta + Y_theta)
+        # print(exp_X_theta_Y_phi)
+
+        log_likelihood = np.sum(a * Xspk_theta + Yspk_theta) - dt * np.sum(exp_X_theta_Y_phi) - \
+                         self.lam / 2 * np.sum(Xsub_theta_data**2)
+
+        g_log_likelihood = np.zeros(len(theta))
+        g_log_likelihood[:1 + n_kappa + n_eta] = a * np.sum(X_spikes, axis=0) - \
+                                                 dt * a * np.matmul(X.T, exp_X_theta_Y_phi) - \
+                                                 self.lam * X_sub.T @ Xsub_theta_data
+        g_log_likelihood[1 + n_kappa + n_eta: -1] = np.sum(Y_spikes, axis=0) - \
+                                                    dt * np.matmul(Y.T, exp_X_theta_Y_phi)
+        g_log_likelihood[-1] = np.sum(Xspk_theta, axis=0) - \
+                               dt * np.matmul(X_theta.T, exp_X_theta_Y_phi)
+
+        h_log_likelihood = np.zeros((len(theta), len(theta)))
+        h_log_likelihood[:n_sub, :n_sub] = - dt * a**2 * np.matmul(X.T * exp_X_theta_Y_phi, X) - self.lam * X_sub.T @ X_sub
+        h_log_likelihood[:n_sub, n_sub:-1] = - dt * a * np.matmul(X.T * exp_X_theta_Y_phi, Y)
+        h_log_likelihood[:n_sub, -1] = np.sum(X_spikes, axis=0) - \
+                                                 dt * np.matmul(X.T, exp_X_theta_Y_phi) - \
+                                                 dt * a * np.matmul(X.T * exp_X_theta_Y_phi, X_theta)
+        h_log_likelihood[n_sub:-1, n_sub:-1] = - dt * np.dot(Y.T * exp_X_theta_Y_phi, Y)
+        h_log_likelihood[n_sub:-1, -1] = -dt * np.matmul(Y.T * exp_X_theta_Y_phi, X_theta)
+        h_log_likelihood[-1, -1] = -dt * np.matmul(X_theta.T * exp_X_theta_Y_phi, X_theta)
+        indices = np.tril_indices(len(theta))
+        h_log_likelihood[indices] = h_log_likelihood.T[indices]
+        # print(h_log_likelihood)
+
+        return log_likelihood, g_log_likelihood, h_log_likelihood
+
+    def get_theta(self):
+        n_kappa = self.kappa.nbasis
+        n_eta = self.eta.nbasis
+        n_gamma = self.gamma.nbasis
+        theta = np.zeros((3 + n_kappa + n_eta + n_gamma))
+        theta[0] = self.vr
+        theta[1:1 + n_kappa] = self.kappa.coefs
+        theta[1 + n_kappa:1 + n_kappa + n_eta] = self.eta.coefs
+        theta[1 + n_kappa + n_eta] = self.vt / self.dv
+        theta[1 + n_kappa + n_eta: -1] = self.gamma.coefs / self.dv
+        theta[-1] = 1 / self.dv
+        return theta
+
+    def get_Xmatrix(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0):
+
+        n_kappa = self.kappa.nbasis
+        n_eta = self.eta.nbasis
+        n_gamma = self.gamma.nbasis
+
+        X = np.zeros(mask_spikes.shape + (1 + n_kappa + n_eta,))
+        Y = np.zeros(mask_spikes.shape + (1 + n_gamma,))
+
+        X_kappa = self.kappa.convolve_basis_continuous(t, stim - stim_h)
+
+        args = np.where(shift_mask(mask_spikes, 1, fill_value=False))
+        t_spk = (t[args[0]], ) + args[1:]
+        X_eta = self.eta.convolve_basis_discrete(t, t_spk, shape=mask_spikes.shape)
+
+        Y_gamma = self.gamma.convolve_basis_discrete(t, t_spk, shape=mask_spikes.shape)
+
+        X[:, :, 0] = 1
+        X[:, :, 1:1 + n_kappa] = X_kappa + np.diff(self.kappa.tbins)[None, None, :] * stim_h
+        X[:, :, 1 + n_kappa:] = -X_eta
+        Y[:, :, 0] = -1
+        Y[:, :, 1:] = -Y_gamma
+
+        X_spikes = X[mask_spikes, :]
+        X_sub = X[mask_subthreshold, :]
+        X = X[np.ones(mask_spikes.shape, dtype=bool), :]
+        Y_spikes = Y[mask_spikes, :]
+        Y = Y[np.ones(mask_spikes.shape, dtype=bool), :]
+
+        Xs = dict(X_spikes=X_spikes, X=X, X_sub=X_sub, data_sub=data[mask_subthreshold], Y_spikes=Y_spikes, Y=Y)
+
+        return Xs
+
+    def fit(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0, theta0=None, newton_kwargs=None, verbose=False):
+        return super().fit(t, stim, mask_spikes, data=data, mask_subthreshold=mask_subthreshold, stim_h=stim_h, theta0=theta0, newton_kwargs=newton_kwargs, verbose=verbose)
+
+class SRM(VGLM):
+
+    def __init__(self, kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None, lam=1):
+        super().__init__(kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None)

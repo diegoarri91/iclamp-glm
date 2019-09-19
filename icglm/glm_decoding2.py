@@ -33,6 +33,8 @@ class GLMDecoder:
         self.tau = tau  # saved
         if Ih is None:
             self.Ih = [0] * self.n_neurons  # saved
+        else:
+            self.Ih = Ih
         self.Imu = Imu  # saved
         self.Isd = Isd  # saved
 
@@ -52,6 +54,7 @@ class GLMDecoder:
         self.cov_I_dec = None
 
         self.r2 = None
+        self.rmse = None
         self.corr = None
         self.hessian_det = None
 
@@ -114,6 +117,10 @@ class GLMDecoder:
         convolution_kappa_t_spikes = convolution_kappa_t_spikes[::-1, ...]
 
         return convolution_kappa_t_spikes
+    
+    def set_rmse(self):
+        self.rmse = np.sqrt(np.mean((self.I_dec - self.I_true)**2))
+        return self
 
     def r2_score(self):
         sum_square_error = np.sum( (self.I_dec - self.I_true )**2. )
@@ -149,7 +156,7 @@ class GLMDecoder:
 
         if prior == 'OU':
 
-            lam = np.exp(- self.dt / self.tau)
+            lam = np.exp(-self.dt / self.tau)
             _mu = self.mu_xi * (1 - np.exp(-self.dt / self.tau))
             _sigma2 = (1 - np.exp(-2 * self.dt / self.tau)) * self.sd_xi ** 2.
 
@@ -171,7 +178,7 @@ class GLMDecoder:
         for n in range(self.n_neurons):
             _I = self.Isd[n] * self.I + self.Imu[n]
             _r, _u = self.glms[n].simulate_subthr(self.t, _I, self.mask_spk[n], full=True, iterating=True,
-                                                 I0=self.Ih[n])
+                                                  stim_h=self.Ih[n])
             log_likelihood += np.sum(_u[self.mask_spk[n]]) - self.dt * np.sum(_r)
 
             g_log_likelihood += -self.dt * self.Isd[n] * self.glms[n].kappa.correlate_continuous(self.t, np.sum(_r, 1),
@@ -179,7 +186,8 @@ class GLMDecoder:
             t_support = self.glms[n].kappa.support
             arg_support = int(t_support[1] / self.dt)
             for v in range(arg_support):
-                h_log_likelihood[v, :] += -self.dt ** 2 * self.Isd[n] * K[n][v].correlate_continuous(self.t, np.sum(_r, 1))
+                # TODO CREO QUE FALTA UN CUADRADO EN self.Isd[n]
+                # h_log_likelihood[v, :] += -self.dt ** 2 * self.Isd[n] * K[n][v].correlate_continuous(self.t, np.sum(_r, 1))
 
         return log_likelihood, g_log_likelihood, h_log_likelihood
 
@@ -397,7 +405,7 @@ class GLMDecoder:
             _I = self.Isd[n] * self.I_dec + self.Imu[n]
             # _I = self.I_dec
             r, v = self.glms[n].simulate_subthr(self.t, _I, self.mask_spk[n], full=True, iterating=True,
-                                               I0=self.Ih[n])
+                                                stim_h=self.Ih[n])
             #axr.plot(self.t, r)
             t_spk = np.stack([self.t] * self.mask_spk[n].shape[1], 1)[self.mask_spk[n]]
             _r_spk = r[self.mask_spk[n]]
@@ -428,29 +436,30 @@ class GLMDecoder:
 
         arg0, argf = searchsorted(self.t, [t0, tf])
 
+        n_neurons = self.n_neurons
         fig = plt.figure(figsize=(12, 4.5))
-        r = 7
-        axI = plt.subplot2grid((10, 1), (10 - r, 0), rowspan=r)
-        ax_raster = plt.subplot2grid((10, 1), (0, 0), rowspan=10 - r, sharex=axI)
+        r1, r2 = 8, 2
+        axI = plt.subplot2grid((r1 + r2 * n_neurons, 1), (n_neurons * r2, 0), rowspan=r1)
+        ax_raster = [plt.subplot2grid((r1 + r2 * n_neurons, 1), (ii * r2, 0), rowspan=r2, sharex=axI) for ii in range(n_neurons)]
 
         axI.plot(self.t[arg0:argf], self.I_true[arg0:argf], color='C0', lw=1, zorder=1)
-        axI.plot(self.t[arg0:argf], self.I_dec[arg0:argf], color='C1', lw=2, zorder=1)
+        axI.plot(self.t[arg0:argf], self.I_dec[arg0:argf], color='C1', lw=1.5, zorder=1)
 
         for n in range(self.n_neurons):
             st = SpikeTrain(self.t[arg0:argf], self.mask_spk[n][arg0:argf])
-            st.plot(ax=ax_raster, color='C' + str(n % 10))
+            st.plot(ax=ax_raster[n], color='C' + str(n % 10))
+            ax_raster[n].xaxis.set_visible(False)
+            ax_raster[n].yaxis.set_visible(False)
+            ax_raster[n].spines['bottom'].set_visible(False)
+            ax_raster[n].spines['top'].set_visible(False)
+            ax_raster[n].spines['left'].set_visible(False)
+            ax_raster[n].spines['right'].set_visible(False)
+            ax_raster[n].set_ylabel('data')
 
         if self.var_I_dec is not None:
             sd = np.sqrt(self.var_I_dec)[arg0:argf]
             axI.fill_between(self.t[arg0:argf], self.I_dec[arg0:argf] - sd, self.I_dec[arg0:argf] + sd, color='C1', alpha=.4, zorder=2)
 
-        ax_raster.xaxis.set_visible(False)
-        ax_raster.yaxis.set_visible(False)
-        ax_raster.spines['bottom'].set_visible(False)
-        ax_raster.spines['top'].set_visible(False)
-        ax_raster.spines['left'].set_visible(False)
-        ax_raster.spines['right'].set_visible(False)
-        ax_raster.set_ylabel('data')
         axI.spines['top'].set_visible(False)
         axI.spines['right'].set_visible(False)
         axI.set_xlabel('time')
