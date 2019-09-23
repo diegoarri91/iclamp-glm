@@ -10,12 +10,13 @@ def diag_indices(n, k=0):
     else:
         return rows, cols
 
-def unband_matrix(banded_matrix, symmetric=True):
+
+def unband_matrix(banded_matrix, symmetric=True, lower=True):
     """
-    Assumes banded_matrix.shape=(n_diags, lent). banded_matrix=[diag0, diag1, diag2, ....]. See scipy format
-    :param banded_matrix:
-    :return:
-    """
+        Assumes banded_matrix.shape=(n_diags, lent). banded_matrix=[diag0, diag1, diag2, ....]. See scipy format
+        :param banded_matrix:
+        :return:
+        """
     N = banded_matrix.shape[1]
     unbanded_matrix = np.zeros((N, N))
     for diag in range(banded_matrix.shape[0]):
@@ -24,7 +25,10 @@ def unband_matrix(banded_matrix, symmetric=True):
     if symmetric:
         indices = np.tril_indices(N)
         unbanded_matrix[indices] = unbanded_matrix.T[indices]
+    if not (symmetric) and lower:
+        unbanded_matrix = unbanded_matrix.T
     return unbanded_matrix
+
 
 def band_matrix(unbanded_matrix, max_band=None):
     N = unbanded_matrix.shape[1]

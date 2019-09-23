@@ -2,76 +2,17 @@ import numpy as np
 
 from .base import BayesianSpikingModel
 from .srm import SRM
-from masks import shift_mask
-from signals import get_dt
+from ..masks import shift_mask
 
 
-class VGLM(BayesianSpikingModel, SRM):
+class VGLM(SRM, BayesianSpikingModel):
 
     def __init__(self, kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None, lam=None):
-        self.vr = vr
-        self.kappa = kappa
-        self.eta = eta
-
-        self.gamma = gamma
-        self.vt = vt
-        self.dv = dv
+        super().__init__(vr=vr, kappa=kappa, eta=eta, vt=vt, dv=dv, gamma=gamma)
         self.lam = lam
 
     def copy(self):
         return self.__class__(u0=self.vr, kappa=self.kappa.copy(), eta=self.eta.copy(), gamma=self.gamma.copy(), vt=self.vt, dv=self.dv)
-
-    # def sample(self, t, stim, stim_h=0, full=False):
-    #
-    #     dt = get_dt(t)
-    #
-    #     if stim.ndim == 1:
-    #         shape = (len(t), 1)
-    #         stim = stim.reshape(len(t), 1)
-    #     else:
-    #         shape = stim.shape
-    #
-    #     v = np.zeros(shape) * np.nan
-    #     r = np.zeros(shape) * np.nan
-    #     eta_conv = np.zeros(shape)
-    #     gamma_conv = np.zeros(shape)
-    #     mask_spk = np.zeros(shape, dtype=bool)
-    #
-    #     kappa_conv = self.kappa.convolve_continuous(t, stim - stim_h) + stim_h * self.kappa.area(dt=dt)
-    #
-    #     j = 0
-    #     while j < len(t):
-    #
-    #         v[j, ...] = kappa_conv[j, ...] - eta_conv[j, ...] + self.vr
-    #         r[j, ...] = np.exp((v[j, ...] - self.vt - gamma_conv[j, ...]) / self.dv)
-    #
-    #         p_spk = 1. - np.exp(-r[j, ...] * dt)
-    #         aux = np.random.rand(*shape[1:])
-    #
-    #         mask_spk[j, ...] = p_spk > aux
-    #
-    #         if np.any(mask_spk[j, ...]) and j < len(t) - 1:
-    #             eta_conv[j + 1:, mask_spk[j, ...]] += self.eta.interpolate(t[j + 1:] - t[j + 1])[:, None]
-    #             gamma_conv[j + 1:, mask_spk[j, ...]] += self.gamma.interpolate(t[j + 1:] - t[j + 1])[:, None]
-    #
-    #         j += 1
-    #
-    #     if full:
-    #         # TODO. DEFINE WHAT THIS SHOULD RETURN
-    #         return r, mask_spk
-    #     else:
-    #         return v, r, mask_spk
-
-    # def set_params(self, theta):
-    #     n_kappa = self.kappa.nbasis
-    #     n_eta = self.eta.nbasis
-    #     self.vr = theta[0]
-    #     self.kappa.coefs = theta[1:n_kappa + 1]
-    #     self.eta.coefs = theta[n_kappa + 1:n_kappa + 1 + n_eta]
-    #     self.vt = theta[n_kappa + 1 + n_eta] / theta[-1]
-    #     self.gamma.coefs = theta[n_kappa + 2 + n_eta:-1] / theta[-1]
-    #     self.dv = 1 / theta[-1]
-    #     return self
 
     def gh_log_likelihood_kernels(self, theta, data_sub, dt, X_spikes, X_sub, X, Y_spikes, Y):
 
@@ -126,11 +67,11 @@ class VGLM(BayesianSpikingModel, SRM):
         theta[1:1 + n_kappa] = self.kappa.coefs
         theta[1 + n_kappa:1 + n_kappa + n_eta] = self.eta.coefs
         theta[1 + n_kappa + n_eta] = self.vt / self.dv
-        theta[1 + n_kappa + n_eta: -1] = self.gamma.coefs / self.dv
+        theta[2 + n_kappa + n_eta: -1] = self.gamma.coefs / self.dv
         theta[-1] = 1 / self.dv
         return theta
 
-    def get_Xmatrix(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0):
+    def get_log_likelihood_kwargs(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0):
 
         n_kappa = self.kappa.nbasis
         n_eta = self.eta.nbasis
@@ -163,10 +104,6 @@ class VGLM(BayesianSpikingModel, SRM):
 
         return Xs
 
-    def fit(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0, theta0=None, newton_kwargs=None, verbose=False):
-        return super().fit(t, stim, mask_spikes, data=data, mask_subthreshold=mask_subthreshold, stim_h=stim_h, theta0=theta0, newton_kwargs=newton_kwargs, verbose=verbose)
+    def fit(self, t, stim, mask_spikes, data=None, mask_subthreshold=None, stim_h=0, newton_kwargs=None, verbose=False):
+        return super().fit(t, stim, mask_spikes, data=data, mask_subthreshold=mask_subthreshold, stim_h=stim_h, newton_kwargs=newton_kwargs, verbose=verbose)
 
-class SRM(VGLM):
-
-    def __init__(self, kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None, lam=1):
-        super().__init__(kappa=None, eta=None, gamma=None, vr=None, vt=None, dv=None)

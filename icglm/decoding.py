@@ -5,7 +5,8 @@ from scipy.linalg import solveh_banded, cholesky_banded, cho_solve_banded, solve
 import time
 
 from .optimization import NewtonMethod
-from .signals import get_dt, diag_indices, searchsorted
+from .signals import diag_indices
+from utils.time import get_dt, searchsorted
 from .spiketrain import SpikeTrain
 
 
@@ -16,6 +17,7 @@ class BayesianDecoder:
 
     def decode(self, t, mask_spikes, stim0=None, mu_stim=0, sd_stim=1, stim_h=0, prior=None, newton_kwargs=None,
                verbose=False):
+        newton_kwargs = newton_kwargs.copy()
         newton_kwargs['stop_cond'] = newton_kwargs['stop_cond'] * np.sum(mask_spikes)
         dt = get_dt(t)
         self.kappa.set_values(dt)
@@ -153,10 +155,6 @@ class MultiModelDecoder:
         convolution_kappa_t_spikes = convolution_kappa_t_spikes[::-1, ...]
 
         return convolution_kappa_t_spikes
-    
-    def set_rmse(self):
-        self.rmse = np.sqrt(np.mean((self.I_dec - self.I_true)**2))
-        return self
 
     def r2_score(self):
         sum_square_error = np.sum( (self.I_dec - self.I_true )**2. )

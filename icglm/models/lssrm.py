@@ -1,10 +1,10 @@
 import numpy as np
-from scipy.stats import kstest
 
 from ..kernels import KernelRect
 from .glm import GLM
 from .srm import SRM
-from ..signals import get_dt, searchsorted, shift_mask
+from ..signals import shift_mask
+from ..utils.time import get_dt
 
 
 class LSSRM(SRM):
@@ -68,7 +68,11 @@ class LSSRM(SRM):
         self.set_supthreshold_params(glm.u0 / glm.kappa.coefs[0], 1 / glm.kappa.coefs[0], glm.eta.coefs / glm.kappa.coefs[0])
         return optimizer, log_likelihood_normed
 
-    def fit(self, t, stim, v, mask_spikes, mask_subthreshold, stim_h=0, newton_kwargs=None, verbose=False):
+    def fit(self, t, stim, mask_spikes, v, mask_subthreshold, stim_h=0, newton_kwargs=None, verbose=False):
         self.fit_subthreshold_voltage(t, stim, v, mask_spikes, mask_subthreshold, stim_h=stim_h)
         optimizer, log_likelihood_normed = self.fit_supthreshold(t, stim, mask_spikes, newton_kwargs=newton_kwargs, verbose=verbose)
         return optimizer, log_likelihood_normed
+
+    def decode(self, t, mask_spikes, stim0=None, mu_stim=0, sd_stim=1, stim_h=0, prior=None, newton_kwargs=None,
+               verbose=False):
+        pass

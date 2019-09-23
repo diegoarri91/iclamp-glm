@@ -322,7 +322,7 @@ class Fitter:
         #     log_likelihood = self.model.log_posterior_iterations[-1]
 
         if isinstance(self.model, SRM):
-            Y_spikes, Y = self.model.glm.get_Xmatrix(self.ic.t, self.v_subhreshold, self.ic.mask_spikes)
+            Y_spikes, Y = self.model.glm.get_log_likelihood_kwargs(self.ic.t, self.v_subhreshold, self.ic.mask_spikes)
             theta = np.concatenate(([self.model.u0], self.model.psi.coefs, self.model.gamma.coefs))
             log_likelihood, _, _ = self.model.glm.gh_log_likelihood_kernels(theta, Y_spikes, Y, self.ic.dt)
             # print(self.model.log_posterior_iterations[-1], log_likelihood)

@@ -1,4 +1,3 @@
-from functools import partial
 import pickle
 
 import numpy as np
@@ -7,13 +6,12 @@ from .base import BayesianSpikingModel
 from ..decoding import BayesianDecoder
 from ..kernels import KernelValues
 from ..masks import shift_mask
-from ..optimization import NewtonMethod
-from ..signals import get_dt
+from ..utils.time import get_dt
 
 
 class GLM(BayesianSpikingModel, BayesianDecoder):
 
-    def __init__(self, kappa=None, eta=None, u0=None):
+    def __init__(self, u0, kappa, eta):
         self.u0 = u0
         self.kappa = kappa
         self.eta = eta
@@ -31,18 +29,16 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
             pickle.dump(params, fit_file)
 
     @classmethod
-    def load(self, path):
+    def load(cls, path):
 
         with open(path, "rb") as fit_file:
             params = pickle.load(fit_file)
-
-        glm = GLM(u0=params['u0'], kappa=params['kappa'], eta=params['eta'])
-
+        glm = cls(u0=params['u0'], kappa=params['kappa'], eta=params['eta'])
         return glm
 
     def sample(self, t, stim, stim_h=0, full=False):
 
-        np.seterr(over='ignore')  # Ignore overflow warning when calculating r[j+1] which can be very big if dV small
+        # np.seterr(over='ignore')  # Ignore overflow warning when calculating r[j+1] which can be very big
 
         u0, kappa = self.u0, self.kappa
         dt = get_dt(t)
@@ -73,16 +69,13 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
                 eta_conv[j + 1:, mask_spk[j, ...]] += self.eta.interpolate(t[j + 1:] - t[j + 1])[:, None]
 
             j += 1
+        v = kappa_conv - eta_conv - u0
         if full:
-            # TODO. DEFINE WHAT THIS SHOULD RETURN
-            return r, mask_spk
+            return kappa_conv, eta_conv, v, r, mask_spk
         else:
-            v = kappa_conv - eta_conv - u0
             return v, r, mask_spk
 
     def simulate_subthreshold(self, t, stim, mask_spk, stim_h=0., full=False):
-
-        u0 = self.u0
 
         if stim.ndim == 1:
             shape = (len(t), 1)
@@ -90,24 +83,22 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
         else:
             shape = stim.shape
 
+        dt = get_dt(t)
         arg_spikes = np.where(shift_mask(mask_spk, 1, fill_value=False))
         t_spikes = (t[arg_spikes[0]], arg_spikes[1])
-
-        dt = get_dt(t)
 
         kappa_conv = self.kappa.convolve_continuous(t, stim - stim_h) + stim_h * self.kappa.area(dt=dt)
 
         if self.eta is not None and len(t_spikes[0]) > 0:
-            eta = self.eta.convolve_discrete(t, t_spikes, shape=mask_spk.shape[1:])
+            eta_conv = self.eta.convolve_discrete(t, t_spikes, shape=shape[1:])
         else:
-            eta = np.zeros(shape)
+            eta_conv = np.zeros(shape)
 
-        v = kappa_conv - eta - u0
+        v = kappa_conv - eta_conv - self.u0
         r = np.exp(v)
 
         if full:
-            # TODO. DEFINE WHAT THIS SHOULD RETURN
-            return v, r
+            return kappa_conv, eta_conv, v, r
         else:
             return v, r
 
@@ -146,21 +137,14 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
 
         return log_prior, g_log_prior, h_log_prior
 
-    def gh_log_likelihood_kernels(self, theta, dt, X_spikes, X):
+    def gh_log_likelihood_kernels(self, theta, dt, X=None, X_spikes=None):
 
         Xspk_theta = np.dot(X_spikes, theta)
         X_theta = np.dot(X, theta)
         exp_X_theta = np.exp(X_theta)
 
-        # Log Likelihood
-        # I remove the last term from the likelihood so it doesnt have to be computed in the iterations
-        # to full likelihood self.logLikelihood should be used
-        log_likelihood = np.sum(Xspk_theta) - dt * np.sum(exp_X_theta)# + np.sum(self.ic.mask_spikes) * np.log(self.ic.dt)
-
-        # Gradient
+        log_likelihood = np.sum(Xspk_theta) - dt * np.sum(exp_X_theta)
         g_log_likelihood = np.sum(X_spikes, axis=0) - dt * np.matmul(X.T, exp_X_theta)
-
-        # Hessian
         h_log_likelihood = - dt * np.dot(X.T * exp_X_theta, X)
 
         return log_likelihood, g_log_likelihood, h_log_likelihood
@@ -174,7 +158,7 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
         theta[1 + n_kappa:] = self.eta.coefs
         return theta
 
-    def get_Xmatrix(self, t, stim, mask_spikes, stim_h=0):
+    def get_likelihood_kwargs(self, t, stim, mask_spikes, stim_h=0):
 
         n_kappa = self.kappa.nbasis
         X_kappa = self.kappa.convolve_basis_continuous(t, stim - stim_h)
@@ -194,9 +178,9 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
 
         X_spikes, X = X[mask_spikes, :], X[np.ones(mask_spikes.shape, dtype=bool), :]
 
-        Xs = dict(X_spikes=X_spikes, X=X)
+        likelihood_kwargs = dict(dt=get_dt(t), X=X, X_spikes=X_spikes)
 
-        return Xs
+        return likelihood_kwargs
 
     def set_params(self, theta):
         n_kappa = self.kappa.nbasis
@@ -211,7 +195,7 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
     #     self.eta.coefs = eta_coefs
     #     return self
 
-    def fit(self, t, stim, mask_spikes, stim_h=0, newton_kwargs=None, verbose=False):
+    def fit(self, t, stim, mask_spikes, stim_h=0, newton_kwargs=None, verbose=False, **kwargs):
         return super().fit(t, stim, mask_spikes, stim_h=stim_h, newton_kwargs=newton_kwargs, verbose=verbose)
 
     def convolution_kappa_t_spikes(self, t, mask_spikes, sd_stim=1):
@@ -237,7 +221,8 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
 
         return K
 
-    def gh_log_likelihood_stim(self, stim, t, mask_spikes, sum_convolution_kappa_t_spikes, K, max_band, mu_stim=0, sd_stim=1, stim_h=0):
+    def gh_log_likelihood_stim(self, stim, t, mask_spikes, sum_convolution_kappa_t_spikes, K, max_band, mu_stim=0,
+                               sd_stim=1, stim_h=0):
 
         dt = get_dt(t)
 
@@ -246,7 +231,8 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
 
         log_likelihood = np.sum(v[mask_spikes]) - dt * np.sum(r)
 
-        g_log_likelihood = dt * sum_convolution_kappa_t_spikes - dt * sd_stim * self.kappa.correlate_continuous(t, np.sum(r, 1))
+        g_log_likelihood = dt * sum_convolution_kappa_t_spikes - \
+                           dt * sd_stim * self.kappa.correlate_continuous(t, np.sum(r, 1))
 
         t_support = self.kappa.support
         arg_support = int(t_support[1] / dt)

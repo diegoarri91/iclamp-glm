@@ -5,7 +5,8 @@ from scipy.linalg import solveh_banded, cholesky_banded, cho_solve_banded, solve
 import time
 
 from .kernels import KernelVals
-from .signals import get_arg, get_dt, diag_indices, searchsorted
+from .signals import get_arg, diag_indices
+from utils.time import get_dt, searchsorted
 from .spiketrain import SpikeTrain
 
 
@@ -338,15 +339,6 @@ class GLMDecoder:
         self.log_det_cov_posterior = -2 * np.sum(np.log(self.banded_cholesky_inv_cov[0, :]))
     
         return self
-
-    def set_log_prior_covariance(self):
-
-        banded_h_log_prior = self.banded_ou_h_log_prior(self.prior)
-        ch = cholesky_banded(-banded_h_log_prior, lower=True)
-        self.log_det_cov_prior = -2 * np.sum(np.log(ch[0, :]))
-        self.var_prior_baseline = np.sum(cho_solve_banded((ch, True), np.ones(len(self.t)))) / len(self.t)
-
-        return self
     
     def set_baseline_variance(self):
         
@@ -380,54 +372,15 @@ class GLMDecoder:
         self.var_I_dec = np.sum(inv_L ** 2, 0)
         
         return self
-    
-    def plot_decoding(self):
-        
-        fig = plt.figure(figsize=(10, 7.5))
-        fig.tight_layout()
-        axI = plt.subplot2grid((3, 3), (0, 0), colspan=3)
-        axr = plt.subplot2grid((3, 3), (1, 0), colspan=3, sharex=axI)
-        ax_log_posterior = [plt.subplot2grid((3, 3), (2, col)) for col in range(3)]
 
-        if self.files is not None:
-            axI.set_title('neuron: ' + ', '.join(self.neurons) + ' file: ' + ', '.join(self.files))
-        
-        axI.plot(self.t, self.I_true, 'C0', zorder=1)
-        axI.plot(self.t, self.I_dec, 'C1', zorder=1)
-        if self.var_I_dec is not None:
-            sd = np.sqrt(self.var_I_dec)
-            axI.fill_between(self.t, self.I_dec - sd, self.I_dec + sd, color='C1', alpha=.4, zorder=2)
-        elif self.cov_I_dec is not None:
-            sd = np.sqrt(np.diag(self.cov_dec))
-            axI.fill_between(self.t, self.I_dec - sd, self.I_dec + sd, color='C1', alpha=.4, zorder=2)
+    def set_log_prior_covariance(self):
 
-        for n in range(self.n_neurons):
-            _I = self.Isd[n] * self.I_dec + self.Imu[n]
-            # _I = self.I_dec
-            r, v = self.glms[n].simulate_subthr(self.t, _I, self.mask_spk[n], full=True, iterating=True,
-                                                stim_h=self.Ih[n])
-            #axr.plot(self.t, r)
-            t_spk = np.stack([self.t] * self.mask_spk[n].shape[1], 1)[self.mask_spk[n]]
-            _r_spk = r[self.mask_spk[n]]
-            n_spikes = np.sum(self.mask_spk[n])
-            if n_spikes > 1000:
-                samp = int(n_spikes / 1000)
-                t_spk = t_spk[::samp]
-                _r_spk = _r_spk[::samp]
-            axr.plot(t_spk,_r_spk , '.')
-        
-        if self.log_posterior_iterations is not None:
-            # log_log_posterior = -np.log(-self.log_posterior_iterations)
-            iterations = np.arange(1, len(self.log_posterior_iterations) + 1, 1)
-            ax_log_posterior[0].plot(iterations , self.log_posterior_iterations, 'C0-')
-            ax_log_posterior[1].plot(iterations , self.log_posterior_iterations - self.log_prior_iterations, 'C0-')
-            ax_log_posterior[2].plot(iterations , self.log_prior_iterations, 'C0-')
-            
-            #logL_norm = np.round(self.logL_norm, 2)
-            #ax_log_posterior[0].text(.6, 0.1, 'logL_norm=' + str(logL_norm),
-                                              #transform=ax_time_rescale_transform[0].transAxes)
+        banded_h_log_prior = self.banded_ou_h_log_prior(self.prior)
+        ch = cholesky_banded(-banded_h_log_prior, lower=True)
+        self.log_det_cov_prior = -2 * np.sum(np.log(ch[0, :]))
+        self.var_prior_baseline = np.sum(cho_solve_banded((ch, True), np.ones(len(self.t)))) / len(self.t)
 
-        return fig, (axI, axr, ax_log_posterior)
+        return self
 
     def plot_decoded_stimulus(self, t0=None, tf=None):
 

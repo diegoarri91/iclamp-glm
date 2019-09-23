@@ -4,7 +4,7 @@ import numpy as np
 from scipy.linalg import solveh_banded
 
 from .masks import shift_mask
-from .signals import get_dt
+from utils.time import get_dt
 
 
 class NewtonMethod:
@@ -14,13 +14,16 @@ class NewtonMethod:
                  stop_cond=5e-4, learning_rate_scaling=0.2, warm_up_iterations=2, verbose=False):
 
         self.theta0 = theta0
-        self.gh_log_prior = gh_log_prior
+
         self.g_log_prior = g_log_prior
         self.h_log_prior = h_log_prior
+        self.gh_log_prior = gh_log_prior
         self.gh_log_likelihood = gh_log_likelihood
-        self.use_prior = True if self.gh_log_prior is not None or self.g_log_prior else False
+
+        self.use_prior = True if self.gh_log_prior is not None or self.g_log_prior is not None else False
         self.banded_h = banded_h
         self.theta_independent_h = theta_independent_h
+
         self.learning_rate = learning_rate
         self.initial_learning_rate = initial_learning_rate
         self.max_iterations = max_iterations
@@ -31,8 +34,10 @@ class NewtonMethod:
         self.verbose = verbose
 
         self.theta_iterations = []
-        self.log_posterior_iterations = []
         self.log_prior_iterations = []
+        self.log_posterior_iterations = []
+        self.g_log_posterior = None
+        self.h_log_posterior = None
         self.fit_status = None
 
     def optimize(self):
@@ -122,7 +127,8 @@ class NewtonMethod:
                 old_g_log_posterior = np.copy(g_log_posterior)
                 old_h_log_posterior = np.copy(h_log_posterior)
                 if self.banded_h:
-                    print(h_log_posterior.shape, g_log_posterior.shape)
+                    # the minus in h_log_posterior comes from the need of it being positive-definite.
+                    # h_log_posterior isnt -h_log_posterior is
                     theta = theta + learning_rate * solveh_banded(-h_log_posterior, g_log_posterior, lower=True)
                 else:
                     theta = theta - learning_rate * np.linalg.solve(h_log_posterior, g_log_posterior)
@@ -135,7 +141,7 @@ class NewtonMethod:
                 learning_rate = learning_rate * self.learning_rate_scaling
                 baseline_lr = False
                 if self.banded_h:
-                    theta = theta + learning_rate * solveh_banded(-h_log_posterior, g_log_posterior, lower=True)
+                    theta = old_theta + learning_rate * solveh_banded(-old_h_log_posterior, old_g_log_posterior, lower=True)
                 else:
                     theta = old_theta - learning_rate * np.linalg.solve(old_h_log_posterior, old_g_log_posterior)
                     # theta = theta + learning_rate * g_log_posterior
@@ -164,5 +170,7 @@ class NewtonMethod:
         self.theta_iterations = np.stack(self.theta_iterations, 1)
         self.log_posterior_iterations = np.array(self.log_posterior_iterations)
         self.log_prior_iterations = np.array(self.log_prior_iterations)
+        self.g_log_posterior = g_log_posterior
+        self.h_log_posterior = h_log_posterior
 
         return self

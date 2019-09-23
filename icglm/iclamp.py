@@ -2,9 +2,10 @@ import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 
-from utils.abf import load_data, load_protocol
+from .utils.abf import load_data, load_protocol
 from .masks import extend_trues, shift_mask
-from .signals import get_dt, searchsorted, mask_extrema, threshold_crossings
+from .signals import mask_extrema, threshold_crossings
+from utils.time import get_dt, searchsorted
 from .utils.time import get_arg
 from .spiketrain import SpikeTrain
 

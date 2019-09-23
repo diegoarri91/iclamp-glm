@@ -3,7 +3,7 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from .signals import get_dt
+from utils.time import get_dt
 from .utils.time import get_arg
 
 

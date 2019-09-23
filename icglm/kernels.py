@@ -2,7 +2,9 @@ import numpy as np
 import matplotlib.pyplot as plt
 from scipy.signal import fftconvolve, convolve
 
-from .signals import diag_indices, get_dt, searchsorted
+from .signals import diag_indices
+from utils.time import get_dt, searchsorted
+
 
 class Kernel:
 

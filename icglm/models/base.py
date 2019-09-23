@@ -4,18 +4,22 @@ from functools import partial
 import numpy as np
 
 from ..optimization import NewtonMethod
-from ..signals import get_dt
+from ..utils.time import get_dt
 
 
 class BayesianSpikingModel:
 
     @abstractmethod
     def sample(self, t, stim, stim_h=0, full=False):
-        return v, r, mask_spikes
+        if not full:
+            v, r, mask_spikes = None, None, None
+            return v, r, mask_spikes
 
     @abstractmethod
     def simulate_subthreshold(self, t, stim, mask_spikes, stim_h=0., full=False):
-        return v, r
+        if not full:
+            v, r = None, None
+            return v, r
 
     @abstractmethod
     def use_prior_kernels(self):
@@ -26,53 +30,42 @@ class BayesianSpikingModel:
         pass
 
     @abstractmethod
-    def gh_log_likelihood_kernels(self, theta, **kwargs):
+    def gh_log_likelihood_kernels(self, theta, dt, **kwargs):
+        log_likelihood, g_log_likelihood, h_log_likelihood = None, None, None
         return log_likelihood, g_log_likelihood, h_log_likelihood
 
+    @abstractmethod
     def get_theta(self):
+        theta = None
         return theta
 
     @abstractmethod
-    def get_Xmatrix(self, t, stim, mask_spikes, stim_h=0):
-        return Xs
+    def get_likelihood_kwargs(self, t, stim, mask_spikes, stim_h=0):
+        pass
 
     @abstractmethod
-    def set_params(self, **kwargs):
-        return self
+    def set_params(self, theta):
+        pass
 
     def fit(self, t, stim, mask_spikes, stim_h=0, newton_kwargs=None, verbose=False, **kwargs):
 
         newton_kwargs = {} if newton_kwargs is None else newton_kwargs
 
         dt = get_dt(t)
-
         theta0 = self.get_theta()
-        Xs = self.get_Xmatrix(t, stim, mask_spikes, stim_h=stim_h, **kwargs)
+        likelihood_kwargs = self.get_likelihood_kwargs(t, stim, mask_spikes, stim_h=stim_h)
 
         gh_log_prior = None if not(self.use_prior_kernels()) else self.gh_log_prior_kernels
-        gh_log_likelihood = partial(self.gh_log_likelihood_kernels, dt=dt, **Xs)
+        gh_log_likelihood = partial(self.gh_log_likelihood_kernels, dt=dt, **likelihood_kwargs)
 
-        optimizer = NewtonMethod(theta0=theta0, gh_log_prior=gh_log_prior, gh_log_likelihood=gh_log_likelihood, banded_h=False,
-                                 verbose=verbose, **newton_kwargs)
+        optimizer = NewtonMethod(theta0=theta0, gh_log_prior=gh_log_prior, gh_log_likelihood=gh_log_likelihood,
+                                 banded_h=False, verbose=verbose, **newton_kwargs)
         optimizer.optimize()
 
         theta = optimizer.theta_iterations[:, -1]
-
         self.set_params(theta)
 
-        N_spikes = np.sum(mask_spikes, 0)
-        N_spikes = N_spikes[N_spikes > 0]
-        if self.use_prior_kernels():
-            log_likelihood = optimizer.log_posterior_iterations[-1] - optimizer.log_prior_iterations[-1] + \
-                         np.sum(N_spikes) * np.log(dt)
-        else:
-            log_likelihood = optimizer.log_posterior_iterations[-1] + np.sum(N_spikes) * np.log(dt)
-
-        log_likelihood_poisson = np.sum(N_spikes * (np.log(N_spikes / len(t)) - 1))  # L_poisson = rho0**n_neurons * np.exp(-rho0*T)
-
-        log_likelihood_normed = (log_likelihood - log_likelihood_poisson) / np.log(2) / np.sum(N_spikes)
-
-        return optimizer, log_likelihood_normed
+        return optimizer
 
     def get_log_likelihood(self, t, stim, mask_spikes, stim_h=0):
         from ..metrics.spikes import log_likelihood_normed
