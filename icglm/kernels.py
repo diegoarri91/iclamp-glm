@@ -240,34 +240,27 @@ class KernelRect(Kernel):
     def exponential(cls, tf=None, dt=None, tau=None, A=None):
         tbins = np.arange(0, tf, dt)
         return cls(tbins, coefs=A * np.exp(-tbins[:-1] / tau))
-    
-    ########################################################################
-    # DECONVOLVE CONTINUOUS SIGNAL
-    ########################################################################
 
-    def convolve_basis_continuous(self, t, I, method='fft'):
+    def convolve_basis_continuous(self, t, I):
 # TODO FIX THIS USING DECONVOLVE SO FITTING WORKS
-        # Given a 1d-array t and an nd-array I with I.shape=(len(t),...) returns X,
+        """# Given a 1d-array t and an nd-array I with I.shape=(len(t),...) returns X,
         # the convolution matrix of each rectangular function of the base with axis 0 of I for all other axis values
         # so that X.shape = (I.shape, nbasis)
         # Discrete convolution can be achieved by using an I with 1/dt on the correct timing values
+        Assumes sorted t"""
 
         dt = get_dt(t)
-
         arg_bins = searchsorted(t, self.tbins)
-
         X = np.zeros(I.shape + (self.nbasis, ))
 
-        if method == 'fft':
+        basis_shape = tuple([len(t)] + [1 for ii in range(I.ndim - 1)] + [self.nbasis])
+        basis = np.zeros(basis_shape)
 
-            basis_shape = tuple([len(t)] + [1 for ii in range(I.ndim - 1)] + [self.nbasis])
-            basis = np.zeros(basis_shape)
+        for k, (arg0, argf) in enumerate(zip(arg_bins[:-1], arg_bins[1:])):
+            basis[arg0:argf, ..., k] = 1.
 
-            for k, (arg0, argf) in enumerate(zip(arg_bins[:-1], arg_bins[1:])):
-                basis[arg0:argf, ..., k] = 1.
-
-            X = fftconvolve(basis, I[..., None])
-            X = X[:len(t), ...] * dt
+        X = fftconvolve(basis, I[..., None], axes=0)
+        X = X[:len(t), ...] * dt
 
         return X
     
