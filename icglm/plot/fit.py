@@ -3,12 +3,14 @@ from abc import abstractmethod
 import matplotlib.pyplot as plt
 import numpy as np
 
+from .spiketrain import SpikeTrainsPlotter
+from ..spiketrain import SpikeTrain
+
 
 class FitPlotter:
 
     def __init__(self, ic=None, model=None, optimizer=None, neuron=None, file=None, log_likelihood_normed=None,
-                 z=None, ks_stats=None,
-                 psth_exp=None, psth_model=None, Md=None, Ma=None):
+                 z=None, ks_stats=None, mask_spikes_model=None, psth_exp=None, psth_model=None, Md=None, Ma=None):
         self.ic = ic
         self.model = model
         self.optimizer = optimizer
@@ -18,6 +20,7 @@ class FitPlotter:
         self.log_likelihood_normed = log_likelihood_normed
         self.z = z
         self.ks_stats = ks_stats
+        self.mask_spikes_model = mask_spikes_model
         self.psth_exp = psth_exp
         self.psth_model = psth_model
         self.Ma = Ma
@@ -27,14 +30,18 @@ class FitPlotter:
     def plot_filters(self, axs):
         pass
 
-    def plot_psth(self, ax=None, lw=.6):
-
+    def plot_psth(self, ax=None, data=True, model=True, colors=None, **kwargs):
+        fig = None
         if ax is None:
             fig, ax = plt.subplots(figsize=(10, 5), ncols=1)
-
-        ax.plot(self.ic.t, self.psth_exp, lw=lw)
-        ax.plot(self.ic.t, self.psth_model, lw=lw)
+        colors = colors if colors is not None else ['C0', 'C1']
+        if data:
+            ax.plot(self.ic.t, self.psth_exp, color=colors[0], **kwargs)
+        if model:
+            ax.plot(self.ic.t, self.psth_model, color=colors[1], **kwargs)
         ax.set_ylim(-.001, np.max(np.concatenate((self.psth_model, self.psth_exp), axis=1)) * 1.15)
+        ax.set_xlabel('time')
+        ax.set_ylabel('psth')
 
         if self.Md is not None:
             Md = np.round(self.Md, 3)
@@ -43,6 +50,108 @@ class FitPlotter:
         if self.Ma is not None:
             Ma = np.round(self.Ma, 3)
             ax.text(.75, 0.92, 'Ma=' + str(Ma), transform=ax.transAxes)
+
+        return fig, ax
+
+    def plot_raster2(self, data=True, model=True, colors=('C0', 'C1'), psth_kwargs=None):
+
+        # fig, axs = plt.subplots(figsize=(12, 7), nrows=3, sharex=True)
+        fig = plt.figure(figsize=(12, 7))
+        r1, r2 = self.ic.mask_spikes.shape[1], self.mask_spikes_model.shape[1]
+        k = 2
+        r3 = k * (r1 + r2)
+        axs = []
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (0, 0), rowspan=r1)]
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (r1, 0), rowspan=r2, sharex=axs[0])]
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (r1 + r2, 0), rowspan=k * (r1 + r2), sharex=axs[0])]
+        fig.subplots_adjust(hspace=-.1)
+
+        st_exp = SpikeTrain(self.ic.t, self.ic.mask_spikes)
+        st_model = SpikeTrain(self.ic.t, self.mask_spikes_model)
+
+        if data:
+            st_exp.plot(ax=axs[0], color=colors[0])
+        if model:
+            st_model.plot(ax=axs[1], color=colors[1])
+
+        psth_kwargs = psth_kwargs if psth_kwargs is not None else {}
+        self.plot_psth(axs[2], data=data, model=model, colors=colors, **psth_kwargs)
+
+        axs[0].xaxis.set_visible(False)
+        axs[0].set_yticks([])
+        axs[0].spines['left'].set_visible(False)
+        axs[0].spines['right'].set_visible(False)
+        axs[0].spines['bottom'].set_visible(False)
+        axs[0].spines['top'].set_visible(False)
+        axs[0].set_ylabel('data')
+        axs[1].xaxis.set_visible(False)
+        axs[1].set_yticks([])
+        axs[1].spines['left'].set_visible(False)
+        axs[1].spines['right'].set_visible(False)
+        axs[1].spines['bottom'].set_visible(False)
+        axs[1].spines['top'].set_visible(False)
+        axs[1].set_ylabel('GLM')
+        axs[2].spines['top'].set_visible(False)
+        axs[2].spines['right'].set_visible(False)
+        axs[2].set_xlabel('time')
+
+        return fig, axs
+
+    def plot_raster(self, data=True, model=True, colors=('C0', 'C1'), figsize=(7, 5), hspace=-0.1, spike_kwargs=None, psth_kwargs=None):
+
+        # fig, axs = plt.subplots(figsize=(12, 7), nrows=3, sharex=True)
+
+        spike_kwargs = spike_kwargs if spike_kwargs is not None else {}
+
+        fig = plt.figure(figsize=figsize)
+        r1, r2 = self.ic.mask_spikes.shape[1], self.mask_spikes_model.shape[1]
+        k = 2
+        r3 = k * (r1 + r2)
+        axs = []
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (0, 0), rowspan=r1)]
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (r1, 0), rowspan=r2, sharex=axs[0])]
+        axs += [plt.subplot2grid((r1 + r2 + r3, 1), (r1 + r2, 0), rowspan=k * (r1 + r2), sharex=axs[0])]
+        fig.subplots_adjust(hspace=hspace)
+
+        # st_exp = SpikeTrain(self.ic.t, self.ic.mask_spikes)
+        # st_model = SpikeTrain(self.ic.t, self.mask_spikes_model)
+
+        if data:
+            SpikeTrainsPlotter(self.ic.t, self.ic.mask_spikes).plot(axs[0], colors=colors[0], **spike_kwargs)
+            axs[0].set_ylabel('data')
+        if model:
+            SpikeTrainsPlotter(self.ic.t, self.mask_spikes_model).plot(axs[1], colors=colors[1], **spike_kwargs)
+            axs[1].set_ylabel('GLM')
+        else:
+            axs[1].xaxis.set_visible(False)
+            axs[1].set_yticks([])
+            axs[1].spines['left'].set_visible(False)
+            axs[1].spines['right'].set_visible(False)
+            axs[1].spines['bottom'].set_visible(False)
+            axs[1].spines['top'].set_visible(False)
+
+
+        psth_kwargs = psth_kwargs if psth_kwargs is not None else {}
+        self.plot_psth(axs[2], data=data, model=model, colors=colors, **psth_kwargs)
+        axs[2].spines['top'].set_visible(False)
+        axs[2].spines['right'].set_visible(False)
+        axs[2].set_xlabel('time')
+
+        return fig, axs
+
+    def plot_posterior_iterations(self, ax):
+        fig = None
+        if ax is None:
+            fig, ax = plt.subplots(5, 5)
+
+        # log_logL = -np.log(-self.optimizer.log_posterior_iterations)
+        log_logL = self.optimizer.log_posterior_iterations
+        ax.plot(range(1, len(self.optimizer.log_posterior_iterations) + 1), log_logL, 'C0-o')
+        ax.set_xlabel('iterations')
+        ax.set_ylabel('posterior')
+        ax.spines['right'].set_visible(False)
+        ax.spines['top'].set_visible(False)
+        return fig, ax
 
     def plot_time_rescale_transform(self, axs=None):
 
@@ -83,26 +192,27 @@ class FitPlotter:
 
 class GLMPlotter(FitPlotter):
 
-    def plot_filters(self, axs=None):
-
+    def plot_filters(self, axs=None, dt=.1, invert_kappa=True, invert_eta=True, exp_eta=False):
+        fig = None
         if axs is None:
             fig, (ax_kappa, ax_eta) = plt.subplots(figsize=(9, 4), ncols=2)
-            ax_kappa.set_xlabel('time');  # ax_kappa.set_ylabel('$\kappa$')
-            ax_kappa.set_ylabel('stim filter')
-            ax_eta.set_xlabel('time');  # ax_eta.set_ylabel('$\eta$')
-            ax_eta.set_ylabel('post-spike filter')
-            ax_kappa.spines['right'].set_visible(False)
-            ax_kappa.spines['top'].set_visible(False)
-            ax_eta.spines['right'].set_visible(False)
-            ax_eta.spines['top'].set_visible(False)
         else:
             ax_kappa = axs[0]
             ax_eta = axs[1]
 
-        t_kappa = np.arange(0., self.model.kappa.tbins[-1], .1)
-        ax_kappa = self.model.kappa.plot(t_kappa, ax=ax_kappa)
-        t_eta = np.arange(0., self.model.eta.tbins[-1], .1)
-        ax_eta = self.model.eta.plot(t_eta, ax=ax_eta)
+        ax_kappa.set_xlabel('time');  # ax_kappa.set_ylabel('$\kappa$')
+        ax_kappa.set_ylabel('stim filter')
+        ax_eta.set_xlabel('time');  # ax_eta.set_ylabel('$\eta$')
+        ax_eta.set_ylabel('post-spike filter')
+        ax_kappa.spines['right'].set_visible(False)
+        ax_kappa.spines['top'].set_visible(False)
+        ax_eta.spines['right'].set_visible(False)
+        ax_eta.spines['top'].set_visible(False)
+
+        t_kappa = np.arange(0., self.model.kappa.support[1], dt)
+        ax_kappa = self.model.kappa.plot(t_kappa, ax=ax_kappa, invert_t=invert_kappa)
+        t_eta = np.arange(0., self.model.eta.support[1], dt)
+        ax_eta = self.model.eta.plot(t_eta, ax=ax_eta, invert_values=invert_eta, exp_values=exp_eta)
 
         return fig, (ax_kappa, ax_eta)
 
@@ -235,36 +345,4 @@ class SRMPlotter(FitPlotter):
     # def plot_ic(self, axv=None, axstim=None, spikes=False, **kwargs):
     #     return self.ic.plot(axv=axv, axstim=axstim, spikes=spikes, **kwargs)
     #
-    # def plot_raster(self):
-    #
-    #     fig, axs = plt.subplots(figsize=(12, 7), nrows=3, sharex=True)
-    #     fig.subplots_adjust(hspace=0)
-    #
-    #     st_exp = SpikeTrain(self.ic.t, self.ic.mask_spikes)
-    #     st_model = SpikeTrain(self.ic.t, self.mask_spikes_model)
-    #
-    #     st_exp.plot(ax=axs[0], color='C0')
-    #     st_model.plot(ax=axs[1], color='C1')
-    #
-    #     self.plot_psth(axs[2], lw=1.5)
-    #
-    #     axs[0].xaxis.set_visible(False)
-    #     axs[0].set_yticks([])
-    #     axs[0].spines['left'].set_visible(False)
-    #     axs[0].spines['right'].set_visible(False)
-    #     axs[0].spines['bottom'].set_visible(False)
-    #     axs[0].spines['top'].set_visible(False)
-    #     axs[0].set_ylabel('data')
-    #     axs[1].xaxis.set_visible(False)
-    #     axs[1].set_yticks([])
-    #     axs[1].spines['left'].set_visible(False)
-    #     axs[1].spines['right'].set_visible(False)
-    #     axs[1].spines['bottom'].set_visible(False)
-    #     axs[1].spines['top'].set_visible(False)
-    #     axs[1].set_ylabel('GLM')
-    #     axs[2].spines['top'].set_visible(False)
-    #     axs[2].spines['right'].set_visible(False)
-    #     axs[2].set_xlabel('time')
-    #
-    #     return fig, axs
-    #
+

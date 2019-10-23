@@ -2,11 +2,11 @@ import numpy as np
 from scipy.stats import kstest
 
 
-def log_likelihood_normed(dt, mask_spikes, v, r):
+def log_likelihood_normed(dt, mask_spikes, u, r):
     lent = mask_spikes.shape[0]
     n_spikes = np.sum(mask_spikes, 0)
     n_spikes = n_spikes[n_spikes > 0]
-    log_likelihood = np.sum(v[mask_spikes]) - dt * np.sum(r) + np.sum(n_spikes) * np.log(dt)
+    log_likelihood = np.sum(u[mask_spikes]) - dt * np.sum(r) + np.sum(n_spikes) * np.log(dt)
     log_likelihood_poisson = np.sum(n_spikes * (np.log(n_spikes / lent) - 1))
     log_like_normed = (log_likelihood - log_likelihood_poisson) / np.log(2) / np.sum(n_spikes)
     return log_like_normed

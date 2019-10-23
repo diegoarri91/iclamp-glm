@@ -1,9 +1,9 @@
 import numpy as np
 import matplotlib.pyplot as plt
-from scipy.signal import fftconvolve, convolve
+from scipy.signal import fftconvolve
 
 from .signals import diag_indices
-from utils.time import get_dt, searchsorted
+from .utils.time import get_dt, searchsorted
 
 
 class Kernel:
@@ -21,7 +21,7 @@ class Kernel:
     #     kernel_values = self.interpolate(t)
     #     return KernelValues(values=kernel_values, support=self.support)
 
-    def plot(self, t=None, ax=None, invert_t=False, invert_values=False, **kwargs):
+    def plot(self, t=None, ax=None, invert_t=False, invert_values=False, exp_values=False,  **kwargs):
 
         if t is None:
             dt = .1
@@ -36,6 +36,8 @@ class Kernel:
             t = -t
         if invert_values:
             y = -y
+        if exp_values:
+            y = np.exp(y)
         ax.plot(t, y, **kwargs)
 
         return ax
@@ -199,6 +201,7 @@ class KernelRect(Kernel):
 
         t = np.atleast_1d(t)
         res = np.zeros(len(t))
+        # TODO. should self.tbins go first???
         arg_bins = searchsorted(t, self.tbins)
 
         for ii, (arg0, argf) in enumerate(zip(arg_bins[:-1], arg_bins[1:])):

@@ -3,6 +3,7 @@ import numpy as np
 from .base import BayesianSpikingModel
 from .srm import SRM
 from ..masks import shift_mask
+from ..utils.time import get_dt
 
 
 class VGLM(SRM, BayesianSpikingModel):
@@ -14,7 +15,8 @@ class VGLM(SRM, BayesianSpikingModel):
     def copy(self):
         return self.__class__(u0=self.vr, kappa=self.kappa.copy(), eta=self.eta.copy(), gamma=self.gamma.copy(), vt=self.vt, dv=self.dv)
 
-    def gh_log_likelihood_kernels(self, theta, data_sub, dt, X_spikes, X_sub, X, Y_spikes, Y):
+    def gh_log_likelihood_kernels(self, theta, dt, data_sub=None, X_spikes=None, X_sub=None, X=None, Y_spikes=None,
+                                  Y=None):
 
         n_kappa = self.kappa.nbasis
         n_eta = self.eta.nbasis
@@ -23,6 +25,7 @@ class VGLM(SRM, BayesianSpikingModel):
         a = theta[-1]
         # a, lam = 1, 1
 
+        npoints_sub = data_sub.shape[0]
         Xsub_theta_data = X_sub @ theta[:1 + n_kappa + n_eta] - data_sub
         Xspk_theta = np.dot(X_spikes, theta[:1 + n_kappa + n_eta])
         Yspk_theta = np.dot(Y_spikes, theta[1 + n_kappa + n_eta: -1])
@@ -32,19 +35,19 @@ class VGLM(SRM, BayesianSpikingModel):
         # print(exp_X_theta_Y_phi)
 
         log_likelihood = np.sum(a * Xspk_theta + Yspk_theta) - dt * np.sum(exp_X_theta_Y_phi) - \
-                         self.lam / 2 * np.sum(Xsub_theta_data**2)
+                         self.lam / 2 * np.sum(Xsub_theta_data**2) / npoints_sub
 
         g_log_likelihood = np.zeros(len(theta))
         g_log_likelihood[:1 + n_kappa + n_eta] = a * np.sum(X_spikes, axis=0) - \
                                                  dt * a * np.matmul(X.T, exp_X_theta_Y_phi) - \
-                                                 self.lam * X_sub.T @ Xsub_theta_data
+                                                 self.lam * X_sub.T @ Xsub_theta_data / npoints_sub
         g_log_likelihood[1 + n_kappa + n_eta: -1] = np.sum(Y_spikes, axis=0) - \
                                                     dt * np.matmul(Y.T, exp_X_theta_Y_phi)
         g_log_likelihood[-1] = np.sum(Xspk_theta, axis=0) - \
                                dt * np.matmul(X_theta.T, exp_X_theta_Y_phi)
 
         h_log_likelihood = np.zeros((len(theta), len(theta)))
-        h_log_likelihood[:n_sub, :n_sub] = - dt * a**2 * np.matmul(X.T * exp_X_theta_Y_phi, X) - self.lam * X_sub.T @ X_sub
+        h_log_likelihood[:n_sub, :n_sub] = - dt * a**2 * np.matmul(X.T * exp_X_theta_Y_phi, X) - self.lam * X_sub.T @ X_sub / npoints_sub
         h_log_likelihood[:n_sub, n_sub:-1] = - dt * a * np.matmul(X.T * exp_X_theta_Y_phi, Y)
         h_log_likelihood[:n_sub, -1] = np.sum(X_spikes, axis=0) - \
                                                  dt * np.matmul(X.T, exp_X_theta_Y_phi) - \
@@ -71,8 +74,9 @@ class VGLM(SRM, BayesianSpikingModel):
         theta[-1] = 1 / self.dv
         return theta
 
-    def get_log_likelihood_kwargs(self, t, stim, mask_spikes, data, mask_subthreshold, stim_h=0):
+    def get_likelihood_kwargs(self, t, stim, mask_spikes, data=None, mask_subthreshold=None, stim_h=0):
 
+        dt = get_dt(t)
         n_kappa = self.kappa.nbasis
         n_eta = self.eta.nbasis
         n_gamma = self.gamma.nbasis
@@ -100,7 +104,7 @@ class VGLM(SRM, BayesianSpikingModel):
         Y_spikes = Y[mask_spikes, :]
         Y = Y[np.ones(mask_spikes.shape, dtype=bool), :]
 
-        Xs = dict(X_spikes=X_spikes, X=X, X_sub=X_sub, data_sub=data[mask_subthreshold], Y_spikes=Y_spikes, Y=Y)
+        Xs = dict(dt=dt, X_spikes=X_spikes, X=X, X_sub=X_sub, data_sub=data[mask_subthreshold], Y_spikes=Y_spikes, Y=Y)
 
         return Xs
 

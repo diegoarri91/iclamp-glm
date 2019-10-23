@@ -1,0 +1,10 @@
+Metadata-Version: 1.0
+Name: iclamp-glm
+Version: 0.1
+Summary: iclamp-glm is a Python module for the analysis of electrophysiological patch clamp data by using encoding and decoding neural models.
+Home-page: https://github.com/diegoarri91/iclamp-glm
+Author: Diego M. Arribas
+Author-email: diegoarri91@gmail.com
+License: BSD 3-Clause License
+Description: UNKNOWN
+Platform: UNKNOWN

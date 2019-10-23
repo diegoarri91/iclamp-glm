@@ -76,6 +76,15 @@ class SRM:
         else:
             return v, r, mask_spikes
 
+    def get_log_likelihood(self, t, stim, mask_spikes, stim_h=0):
+        from ..metrics.spikes import log_likelihood_normed
+        dt = get_dt(t)
+        kappa_conv, eta_conv, gamma_conv, v, r = self.simulate_subthreshold(t, stim, mask_spikes,
+                                                                            stim_h=stim_h, full=True)
+        u = (v - self.vt - gamma_conv) / self.dv
+        log_like_normed = log_likelihood_normed(dt, mask_spikes, u, r)
+        return log_like_normed
+
     def set_params(self, theta):
         n_kappa = self.kappa.nbasis
         n_eta = self.eta.nbasis

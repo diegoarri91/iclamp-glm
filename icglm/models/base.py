@@ -1,8 +1,6 @@
 from abc import abstractmethod
 from functools import partial
 
-import numpy as np
-
 from ..optimization import NewtonMethod
 from ..utils.time import get_dt
 
@@ -51,12 +49,11 @@ class BayesianSpikingModel:
 
         newton_kwargs = {} if newton_kwargs is None else newton_kwargs
 
-        dt = get_dt(t)
         theta0 = self.get_theta()
-        likelihood_kwargs = self.get_likelihood_kwargs(t, stim, mask_spikes, stim_h=stim_h)
+        likelihood_kwargs = self.get_likelihood_kwargs(t, stim, mask_spikes, stim_h=stim_h, **kwargs)
 
         gh_log_prior = None if not(self.use_prior_kernels()) else self.gh_log_prior_kernels
-        gh_log_likelihood = partial(self.gh_log_likelihood_kernels, dt=dt, **likelihood_kwargs)
+        gh_log_likelihood = partial(self.gh_log_likelihood_kernels, **likelihood_kwargs)
 
         optimizer = NewtonMethod(theta0=theta0, gh_log_prior=gh_log_prior, gh_log_likelihood=gh_log_likelihood,
                                  banded_h=False, verbose=verbose, **newton_kwargs)

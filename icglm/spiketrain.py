@@ -3,8 +3,8 @@ import pickle
 import numpy as np
 import matplotlib.pyplot as plt
 
-from utils.time import get_dt
-from .utils.time import get_arg
+from .masks import extend_trues, shift_mask
+from .utils.time import get_arg, get_dt, searchsorted
 
 
 class SpikeTrain:
@@ -38,7 +38,21 @@ class SpikeTrain:
         t_spk = (self.t[args[0]],) + args[1:]
         return t_spk
 
-    def plot(self, ax=None, **kwargs):
+    def restrict(self, t0=None, tf=None, reset_time=True):
+
+        t0 = t0 if t0 is not None else self.t[0]
+        tf = tf if tf is not None else self.t[-1] + self.dt
+        arg0, argf = searchsorted(self.t, [t0, tf])
+
+        t = self.t[arg0:argf]
+        mask = self.mask[arg0:argf]
+
+        if reset_time:
+            t = t - t[0]
+
+        return SpikeTrain(t, mask)
+
+    def plot(self, ax=None, offset=0, **kwargs):
 
         sweeps = kwargs.get('sweeps', range(self.nsweeps))
         color = kwargs.get('color', ['C' + str(ii % 10) for ii in range(len(sweeps))])
@@ -60,16 +74,38 @@ class SpikeTrain:
             t_spikes_ = np.array([t_spikes_] * 2)
 
             bars = np.zeros((2, t_spikes_.shape[1])) * np.nan
-            bars[0, :] = -ii + delta / 2.
-            bars[1, :] = -ii - delta / 2.
+            bars[0, :] = -ii + delta / 2. -offset
+            bars[1, :] = -ii - delta / 2. -offset
 
             ax.plot(t_spikes_, bars, '-', linewidth=linewidth, color=color[ii])
 
         extra_range = (self.t[-1] - self.t[0]) * .005
         ax.set_xlim(self.t[0] - extra_range, self.t[-1] + extra_range)
-        ax.set_ylim(-ii - (delta / 2. + (1 - delta)), delta / 2. + (1 - delta))
+        ax.set_ylim(-ii - offset - (delta / 2. + (1 - delta)), delta / 2. + (1 - delta))
 
         return ax
+
+    def prespike_average(self, signal, tl, tr=0, throw_spikes=True):
+
+        argl, argr = get_arg([tl, tr], self.dt)
+
+        signal = np.copy(signal)
+        mask_around_spk = extend_trues(shift_mask(self.mask, 1, fill_value=False), 0, argl)
+
+        if throw_spikes:
+            mask_spk = self.mask & ~mask_around_spk
+        else:
+            mask_spk = self.mask
+            signal[mask_around_spk] = np.nan
+
+        mask_spk[:argl] = False
+        index = np.where(mask_spk)
+        sta = [signal[i_spk - argl:i_spk - argr + 1, sw] for i_spk, sw in zip(*index)]
+        sta = np.stack(sta, 1)
+
+        t_sta = np.arange(-argl, -argr + 1, 1) * self.dt
+
+        return t_sta, sta
 
     def dot(self, st, kernel1, kernel2):
         '''
@@ -278,5 +314,4 @@ class SpikeTrain:
         spk_count = self.get_spike_count(bins, average_sweeps=False)
         
         return np.var(spk_count, 1) / np.mean(spk_count, 1)
-        
         

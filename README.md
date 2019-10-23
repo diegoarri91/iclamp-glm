@@ -13,7 +13,7 @@ ic = ic.subtract_Ih(th=1000.1).restrict(t0=1000.1, tf=11000.1) # subtract holdin
 ic.set_mask_spikes(thr=0, t_before_spike_peak=0.8) # set spikes
 ic = ic.subsample(1) # subsample data
 
-fig, _ = ic.plot(sweeps=[0], spikes=True)
+fig, axs = ic.plot(sweeps=[0], spikes=True)
 ```
 <p align="center">
   <img src=/examples/ic_plot.png>

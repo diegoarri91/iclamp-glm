@@ -2,12 +2,11 @@ import itertools
 import matplotlib.pyplot as plt
 import numpy as np
 
-from .utils.abf import load_data, load_protocol
 from .masks import extend_trues, shift_mask
 from .signals import mask_extrema, threshold_crossings
-from utils.time import get_dt, searchsorted
-from .utils.time import get_arg
 from .spiketrain import SpikeTrain
+from .utils.abf import load_data, load_protocol
+from .utils.time import get_arg, get_dt, searchsorted
 
 
 class IClamp:
@@ -32,6 +31,10 @@ class IClamp:
     def new(self, t, data, stim, mask_spikes=None):
         metadata = {key: val for key, val in vars(self).items() if key not in ['t', 'data', 'stim', 'mask_spikes']}
         return self.__class__(t=t, data=data, stim=stim, mask_spikes=mask_spikes, **metadata)
+
+    def copy(self):
+        return self.__class__(t=self.t.copy(), data=self.data.copy(), stim=self.stim.copy(),
+                              mask_spikes=self.mask_spikes.copy())
 
     @property
     def v(self):
@@ -136,7 +139,7 @@ class IClamp:
             fig = None
 
         st= SpikeTrain(self.t, self.mask_spikes)
-        psth = st.get_PSTH(kernel)
+        psth = st.get_psth(kernel)
 
         ax.plot(self.t, psth, color='dodgerblue', lw=lw)
 

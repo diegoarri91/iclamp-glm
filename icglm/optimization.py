@@ -3,15 +3,12 @@ import time
 import numpy as np
 from scipy.linalg import solveh_banded
 
-from .masks import shift_mask
-from utils.time import get_dt
-
 
 class NewtonMethod:
 
-    def __init__(self, theta0=None, g_log_prior=None, h_log_prior=None, gh_log_prior=None, gh_log_likelihood=None, banded_h=False, theta_independent_h=False,
-                 learning_rate=1e-1, initial_learning_rate=1e-2, max_iterations=200,
-                 stop_cond=5e-4, learning_rate_scaling=0.2, warm_up_iterations=2, verbose=False):
+    def __init__(self, theta0=None, g_log_prior=None, h_log_prior=None, gh_log_prior=None, gh_log_likelihood=None,
+                 banded_h=False, theta_independent_h=False, learning_rate=1e-1, initial_learning_rate=1e-2,
+                 max_iterations=200, stop_cond=5e-4, learning_rate_scaling=0.2, warm_up_iterations=2, verbose=False):
 
         self.theta0 = theta0
 
@@ -30,7 +27,6 @@ class NewtonMethod:
         self.stop_cond = stop_cond
         self.learning_rate_scaling = learning_rate_scaling
         self.warm_up_iterations = warm_up_iterations
-        # print(self.learning_rate, self.initial_learning_rate, self.max_iterations, self.stop_cond, self.learning_rate_scaling, self.warm_up_iterations)
         self.verbose = verbose
 
         self.theta_iterations = []
@@ -41,10 +37,6 @@ class NewtonMethod:
         self.fit_status = None
 
     def optimize(self):
-
-        # dt = get_dt(t)
-        # n_kappa = self.kappa.nbasis
-        # Y_spikes, Y = self.get_Ymatrix(t, stim, mask_spikes, Ih=Ih)
 
         log_prior = np.nan
         theta = self.theta0
@@ -115,8 +107,9 @@ class NewtonMethod:
                 converged = False
                 nan_parameters = False
                 n_iterations = ii + 1
-
+            # print('\n', theta[0], theta[1], log_posterior, np.min(g_log_posterior), np.max(g_log_posterior))
             if len(self.log_posterior_iterations) == 1 or diff_log_posterior > 0:
+
                 if last_iteration_monotonic:
                     if ii >= self.warm_up_iterations:
                         learning_rate = self.learning_rate
@@ -129,22 +122,31 @@ class NewtonMethod:
                 if self.banded_h:
                     # the minus in h_log_posterior comes from the need of it being positive-definite.
                     # h_log_posterior isnt -h_log_posterior is
-                    theta = theta + learning_rate * solveh_banded(-h_log_posterior, g_log_posterior, lower=True)
+                    try:
+                        theta = theta + learning_rate * solveh_banded(-h_log_posterior, g_log_posterior, lower=True)
+                    except np.linalg.LinAlgError as e:
+                        theta = np.zeros(len(theta)) * np.nan
+
                 else:
                     theta = theta - learning_rate * np.linalg.solve(h_log_posterior, g_log_posterior)
+                    # print('\n', theta[1])
                     # theta = theta + learning_rate * g_log_posterior
                 last_iteration_monotonic = True
             else:
+
                 self.log_prior_iterations = self.log_prior_iterations[:-1] + [self.log_prior_iterations[-2]]
                 self.log_posterior_iterations = self.log_posterior_iterations[:-1] + [self.log_posterior_iterations[-2]]
                 self.theta_iterations = self.theta_iterations[:-1] + [self.theta_iterations[-2]]
                 learning_rate = learning_rate * self.learning_rate_scaling
                 baseline_lr = False
                 if self.banded_h:
-                    theta = old_theta + learning_rate * solveh_banded(-old_h_log_posterior, old_g_log_posterior, lower=True)
+                    try:
+                        theta = old_theta + learning_rate * solveh_banded(-old_h_log_posterior, old_g_log_posterior, lower=True)
+                    except np.linalg.LinAlgError as e:
+                        theta = np.zeros(len(theta)) * np.nan
                 else:
                     theta = old_theta - learning_rate * np.linalg.solve(old_h_log_posterior, old_g_log_posterior)
-                    # theta = theta + learning_rate * g_log_posterior
+                    # theta = old_theta + learning_rate * g_log_posterior
                 last_iteration_monotonic = False
 
         fitting_time = (time.time() - t0) / 60.

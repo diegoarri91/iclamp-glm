@@ -1,9 +1,8 @@
 import numpy as np
 from scipy.linalg import cholesky_banded, solveh_banded
 
-from utils.time import get_dt
 from .utils.linalg import diag_indices, band_matrix, unband_matrix
-from .utils.time import get_arg
+from .utils.time import get_arg, get_dt
 
 
 class OUProcess:
@@ -124,12 +123,11 @@ class OUProcess:
         ch = cholesky_banded(-self.h_log_prior(eta, dt, banded=True), lower=True)
         return -2 * np.sum(np.log(ch[0, :]))
 
-class GeneralCov:
+class AutoCorr:
 
-    def __init__(self, mu=None, sd=None, cov=None, autocorr_fun=None, pars=None):
+    def __init__(self, mu=None, sd=None, autocorr_fun=None, pars=None):
         self.mu = mu
         self.sd = sd
-        self.cov = cov
         self.autocorr_fun = autocorr_fun
         self.pars = pars
         self.inv_cov = None
@@ -137,15 +135,13 @@ class GeneralCov:
         self.ch_lower = None
 
     def set_prior_on_t(self, t, t_max_band_cov=None, eps_max_band_inv_cov=1e-6, inv_cov=True, cholesky=False):
-        if self.autocorr_fun is not(None):
-            dt = get_dt(t)
-            t_max_band_cov = t_max_band_cov if t_max_band_cov is not None else t[-1]
-            max_band = min(get_arg(t_max_band_cov, dt, func='ceil'), len(t))
-            cov = np.zeros((max_band, len(t)))
-            for v in range(max_band):
-                cov[v, :len(t) - v] = self.sd**2 * self.autocorr_fun(t[v], **self.pars)
-        else:
-            cov = self.cov.copy()
+
+        dt = get_dt(t)
+        t_max_band_cov = t_max_band_cov if t_max_band_cov is not None else t[-1]
+        max_band = min(get_arg(t_max_band_cov, dt, func='ceil'), len(t))
+        cov = np.zeros((max_band, len(t)))
+        for v in range(max_band):
+            cov[v, :len(t) - v] = self.sd**2 * self.autocorr_fun(t[v], **self.pars)
 
         if inv_cov:
             self.inv_cov = solveh_banded(cov, np.eye(len(t)), lower=True)
@@ -155,14 +151,17 @@ class GeneralCov:
 
         if cholesky:
             ch = cholesky_banded(cov, lower=True)
-            self.ch_lower = unband_matrix(ch, symmetric=False).T
+            self.ch_lower = unband_matrix(ch, symmetric=False, lower=True)
 
         return self
 
-    def sample(self, shape=(1,), seed=None):
+    def sample(self, t, shape=(1,), seed=None):
         np.random.seed(seed)
         xi = self.ch_lower @ np.random.randn(self.ch_lower.shape[0], *shape) + self.mu
         return xi
+
+    def get_log_prior_kwargs(self, t):
+        return {}
 
     def g_log_prior(self, xi):
         g_log_prior = -self.inv_cov @ (xi - self.mu)
@@ -172,7 +171,7 @@ class GeneralCov:
     def h_log_prior(self, xi):
         return -self.inv_cov_banded
 
-class GeneralCov2:
+class GeneralCov:
 
     def __init__(self, mu=None, cov=None):
         self.mu = mu
