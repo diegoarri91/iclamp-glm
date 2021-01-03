@@ -29,7 +29,10 @@ class BayesianDecoder:
     def decode(self, t, mask_spikes, stim0, mu_stim, sd_stim, stim_h, prior=None, newton_kwargs=None,
                verbose=False):
         newton_kwargs = newton_kwargs.copy()
-        newton_kwargs['stop_cond'] = newton_kwargs['stop_cond'] * np.sum(mask_spikes)
+        if isinstance(mask_spikes, list):
+            newton_kwargs['stop_cond'] = newton_kwargs['stop_cond'] * np.sum(np.concatenate(mask_spikes, 1))
+        else:
+            newton_kwargs['stop_cond'] = newton_kwargs['stop_cond'] * np.sum(mask_spikes)
         dt = get_dt(t)
         sum_convolution_kappa_t_spikes = self.sum_convolution_kappa_t_spikes(t, mask_spikes, sd_stim=sd_stim)
         K = self.build_K(dt)
