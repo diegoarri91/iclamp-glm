@@ -5,3 +5,7 @@ icglm/.ipynb_checkpoints/
 icglm/__pycache__
 icglm/.idea
 iclamp_glm.egg-info/
+icglm/kernels/__pycache__/
+icglm/metrics/__pycache__/
+icglm/plot/__pycache__/
+icglm/utils/__pycache__/
