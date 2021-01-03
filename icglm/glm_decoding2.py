@@ -4,7 +4,7 @@ import numpy as np
 from scipy.linalg import solveh_banded, cholesky_banded, cho_solve_banded, solve_triangular
 import time
 
-from .kernels import KernelVals
+from .kernels.rect import KernelVals
 from .signals import get_arg, diag_indices
 from utils.time import get_dt, searchsorted
 from .spiketrain import SpikeTrain

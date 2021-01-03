@@ -5,7 +5,7 @@ import matplotlib.pyplot as plt
 import numpy as np
 
 from icglm.glm import GLM
-from icglm.kernels import KernelRect
+from icglm.kernels.rect import KernelRect
 from icglm.processes import WienerPhaseProcess
 
 t = np.arange(0, 1000, 1)

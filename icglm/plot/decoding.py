@@ -19,13 +19,28 @@ class DecodingPlotter:
         self.var_stim_dec = var_stim_dec
         self.stim_true = stim_true
 
-    def plot_decoded_stimulus(self, ax_raster=None, axI=None, t0=None, tf=None, spike_kwargs=None, stim_kwargs=None):
+    def plot_decoded_stimulus(self, ax_raster=None, axI=None, t0=None, tf=None, spike_kwargs=None,
+                              stim_dec_kwargs=None, stim_true_kwargs=None):
 
         dt = get_dt(self.t)
         t0 = t0 if t0 is not None else self.t[0]
         tf = tf if tf is not None else self.t[-1] + dt
-        stim_kwargs = stim_kwargs if stim_kwargs else {}
+        # stim_kwargs = stim_kwargs.copy() if stim_kwargs else {}
+        stim_true_kwargs = stim_true_kwargs if stim_true_kwargs else {}
+        stim_dec_kwargs = stim_dec_kwargs if stim_dec_kwargs else {}
         spike_kwargs = spike_kwargs if spike_kwargs else {}
+        # plot_kwargs = stim_kwargs.copy()
+
+        # if 'color_true' in plot_kwargs.keys():
+        #     del plot_kwargs['color_true']
+        #     color_true = stim_kwargs['color_true']
+        # else:
+        #     color_true = 'C0'
+        # if 'color_dec' in plot_kwargs.keys():
+        #     del plot_kwargs['color_dec']
+        #     color_dec = stim_kwargs['color_dec']
+        # else:
+        #     color_dec = 'C1'
 
         arg0, argf = searchsorted(self.t, [t0, tf])
 
@@ -38,8 +53,8 @@ class DecodingPlotter:
             axI = plt.subplot2grid((r1 + r2 * n_neurons, 1), (n_neurons * r2, 0), rowspan=r1)
             ax_raster = [plt.subplot2grid((r1 + r2 * n_neurons, 1), (ii * r2, 0), rowspan=r2, sharex=axI) for ii in range(n_neurons)]
 
-        axI.plot(self.t[arg0:argf], self.stim_true[arg0:argf], color='C0', zorder=1, **stim_kwargs)
-        axI.plot(self.t[arg0:argf], self.stim_dec[arg0:argf], color='C1', zorder=2, **stim_kwargs)
+        axI.plot(self.t[arg0:argf], self.stim_true[arg0:argf], zorder=1, **stim_true_kwargs)
+        axI.plot(self.t[arg0:argf], self.stim_dec[arg0:argf], zorder=2, **stim_dec_kwargs)
 
         SpikeTrainsPlotter(self.t, self.mask_spikes).plot(ax=ax_raster, t0=t0, tf=tf, **spike_kwargs)
 

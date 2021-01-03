@@ -52,7 +52,7 @@ class SpikeTrain:
 
         return SpikeTrain(t, mask)
 
-    def plot(self, ax=None, offset=0, **kwargs):
+    def plot2(self, ax=None, offset=0, **kwargs):
 
         sweeps = kwargs.get('sweeps', range(self.nsweeps))
         color = kwargs.get('color', ['C' + str(ii % 10) for ii in range(len(sweeps))])
@@ -82,6 +82,29 @@ class SpikeTrain:
         extra_range = (self.t[-1] - self.t[0]) * .005
         ax.set_xlim(self.t[0] - extra_range, self.t[-1] + extra_range)
         ax.set_ylim(-ii - offset - (delta / 2. + (1 - delta)), delta / 2. + (1 - delta))
+
+        return ax
+
+    def plot(self, ax=None, offset=0, **kwargs):
+
+        sweeps = kwargs.get('sweeps', range(self.nsweeps))
+        color = kwargs.get('color', 'C0')
+        # t0 = kwargs.get('t0', 0.)
+        # tf = kwargs.get('tf', self.t[-1])
+        ms = kwargs.get('ms', 7)
+
+        if ax is None:
+            figsize = kwargs.get('figsize', (8, 5))
+            fig, ax = plt.subplots(figsize=figsize)
+
+        arg_spikes = np.where(self.mask)
+
+        ax.plot(self.t[arg_spikes[0]], offset + arg_spikes[1], 'o', color=color, ms=ms, mew=0)
+
+        if ax is None:
+            extra_range = (self.t[-1] - self.t[0]) * .01
+            ax.set_xlim(self.t[0] - extra_range, self.t[-1] + extra_range)
+            ax.set_ylim(-0.2, self.mask.shape[1] + 0.2)
 
         return ax
 
@@ -314,4 +337,47 @@ class SpikeTrain:
         spk_count = self.get_spike_count(bins, average_sweeps=False)
         
         return np.var(spk_count, 1) / np.mean(spk_count, 1)
-        
+
+    def sliding_fano_factor(self, kernel):
+
+        conv = self.convolve(kernel)
+        mean, var = np.mean(conv, 1), np.var(conv, 1, ddof=1)
+        fano = np.ones(len(conv))
+        mask = mean > 0
+        fano[mask] = var[mask] / mean[mask]
+
+        return fano
+
+    def get_outlier_trials(self, b=5):
+        n_spikes = np.sum(self.mask, 0)
+        median = np.median(n_spikes)
+        mad = np.median(np.abs(n_spikes - median))
+        deviations = np.abs(n_spikes - median)
+        return deviations > b * mad
+
+    def signal_before_spikes(self, signal, tl, tr, t_ref=None, average=True):
+
+        argl = get_arg(tl, self.dt)
+        argr = get_arg(tr, self.dt)
+
+        signal = np.concatenate((np.zeros((argl, ) + signal.shape[1:]) * np.nan,
+                                 signal,
+                                 np.zeros((argr,) + signal.shape[1:]) * np.nan), axis=0)
+        mask_spk = np.concatenate((np.zeros((argl, ) + self.mask.shape[1:], dtype=bool),
+                                   self.mask,
+                                   np.zeros((argr,) + self.mask.shape[1:], dtype=bool)), axis=0)
+        if t_ref is not None:
+            arg_ref = get_arg(t_ref, self.dt)
+            # mask_around_spk = extend_trues(shift_mask(mask_spk, 1, fill_value=False), 0, arg_ref) # doesnt do what I wanted
+            # signal[mask_around_spk] = np.nan
+            mask_spk = mask_spk & ~extend_trues(shift_mask(mask_spk, 1, fill_value=False), 0, arg_ref)
+
+        index = np.where(mask_spk)
+        sta = np.stack([signal[i_spk - argl:i_spk + argr + 1, sw] for i_spk, sw in zip(*index)], 1)
+
+        if average:
+            sta = np.nanmean(sta, 1)
+
+        t_sta = np.arange(-argl, argr + 1, 1) * self.dt
+
+        return t_sta, sta

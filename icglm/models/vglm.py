@@ -15,6 +15,37 @@ class VGLM(SRM, BayesianSpikingModel):
     def copy(self):
         return self.__class__(u0=self.vr, kappa=self.kappa.copy(), eta=self.eta.copy(), gamma=self.gamma.copy(), vt=self.vt, dv=self.dv)
 
+    def use_prior_kernels(self):
+        return self.kappa.prior is not None or self.eta.prior is not None or self.gamma.prior
+
+    def gh_log_prior_kernels(self, theta):
+
+        n_kappa = self.kappa.nbasis
+        n_eta = self.eta.nbasis
+        log_prior = 0
+        g_log_prior = np.zeros(len(theta))
+        h_log_prior = np.zeros((len(theta), len(theta)))
+
+        if self.kappa.prior is not None:
+            _log_prior, _g_log_prior, _h_log_prior = self.kappa.gh_log_prior(theta[1:n_kappa + 1])
+            log_prior += _log_prior
+            g_log_prior[1:n_kappa + 1] = _g_log_prior
+            h_log_prior[1:n_kappa + 1, 1:n_kappa + 1] = _h_log_prior
+
+        if self.eta.prior is not None:
+            _log_prior, _g_log_prior, _h_log_prior = self.eta.gh_log_prior(theta[1 + n_kappa:1 + n_kappa + n_eta])
+            log_prior += _log_prior
+            g_log_prior[1 + n_kappa:1 + n_kappa + n_eta] = _g_log_prior
+            h_log_prior[1 + n_kappa:1 + n_kappa + n_eta:, 1 + n_kappa:1 + n_kappa + n_eta] = _h_log_prior
+
+        if self.gamma.prior is not None:
+            _log_prior, _g_log_prior, _h_log_prior = self.gamma.gh_log_prior(theta[2 + n_kappa + n_eta: -1])
+            log_prior += _log_prior
+            g_log_prior[2 + n_kappa + n_eta: -1] = _g_log_prior
+            h_log_prior[2 + n_kappa + n_eta: -1, 2 + n_kappa + n_eta: -1] = _h_log_prior
+
+        return log_prior, g_log_prior, h_log_prior
+
     def gh_log_likelihood_kernels(self, theta, dt, data_sub=None, X_spikes=None, X_sub=None, X=None, Y_spikes=None,
                                   Y=None):
 
