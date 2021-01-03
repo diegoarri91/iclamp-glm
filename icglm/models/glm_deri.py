@@ -4,7 +4,7 @@ import numpy as np
 
 from .base import BayesianSpikingModel
 from ..decoding import BayesianDecoder
-from ..kernels import KernelValues
+from ..kernels.rect import KernelValues
 from ..masks import shift_mask
 from ..utils.time import get_dt
 

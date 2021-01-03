@@ -6,7 +6,7 @@ import time
 
 from models.glm import GLM
 from .iclamp import IClamp
-from .kernels import KernelFun, KernelRect
+from .kernels.rect import KernelFun, KernelRect
 from .masks import shift_mask
 from .signals import get_arg, diag_indices
 from .spiketrain import SpikeTrain

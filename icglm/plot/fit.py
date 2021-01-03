@@ -257,13 +257,14 @@ class GLMPlotter(FitPlotter):
 class SRMPlotter(FitPlotter):
 
     def __init__(self, ic=None, srm=None, mask_subthreshold=None, optimizer=None, neuron=None, file=None, log_likelihood_normed=None,
-                 z=None, ks_stats=None, psth_exp=None, psth_model=None, Md=None, Ma=None, v_exp=None, v_model=None):
+                 z=None, ks_stats=None, psth_exp=None, psth_model=None, Md=None, Ma=None, v_exp=None, v_model=None, rmse=None):
         super().__init__(ic=ic, model=srm, optimizer=optimizer, neuron=neuron, file=file,
                          log_likelihood_normed=log_likelihood_normed, z=z, ks_stats=ks_stats, psth_exp=psth_exp,
                          psth_model=psth_model, Md=Md, Ma=Ma)
         self.v_exp = v_exp
         self.v_model = v_model
         self.mask_subthreshold = mask_subthreshold
+        self.rmse = rmse
 
     def plot_filters(self, axs=None):
 
@@ -311,12 +312,17 @@ class SRMPlotter(FitPlotter):
                 warnings.simplefilter("ignore")
                 v_exp = self.v_exp.copy()
                 v_exp[~self.mask_subthreshold] = np.nan
-                v_exp = np.nanmean(v_exp, 1)
+                # v_exp = np.nanmean(v_exp, 1)
                 v_model = self.v_model.copy()
                 v_model[~self.mask_subthreshold] = np.nan
-                v_model = np.nanmean(v_model, 1)
+                # mask = ~np.all(self.mask_subthreshold, 1)
+                # v_model[mask, :] = np.nan
+                # v_model = np.nanmean(v_model, 1)
             axv.plot(self.ic.t, v_exp, 'C0', lw=0.5)
-            axv.plot(self.ic.t, v_model, 'C1', lw=0.5)
+            axv.plot(self.ic.t, v_model, 'C1', lw=0.2)
+            if self.rmse is not None:
+                rmse = np.round(self.rmse, 2)
+                axv.text(.15, 0.92, 'rmse=' + str(rmse), transform=axv.transAxes)
 
         if self.file is not None:
             axr.set_title('neuron: ' + self.neuron + ' file: ' + self.file)

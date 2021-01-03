@@ -2,7 +2,7 @@ from abc import abstractmethod
 from functools import partial
 import numpy as np
 
-from .kernels import KernelValues
+from .kernels.base import KernelValues
 from .optimization import NewtonMethod
 from .utils.time import get_dt
 

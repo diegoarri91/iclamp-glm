@@ -5,7 +5,7 @@ from scipy.stats import kstest
 
 from models.srm import SRM
 from .iclamp import IClamp
-from .kernels import KernelFun
+from .kernels.base import KernelFun
 from .spiketrain import SpikeTrain
 
 

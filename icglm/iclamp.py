@@ -243,7 +243,7 @@ class IClamp:
 
             mask_dvdt_thres_crossings = threshold_crossings(self.get_dvdt(), dvdt_threshold)
 
-            # when they cross the threshold and come t_before_spike_peak ms before a spike peak
+            # when they cross the dvdt threshold and come t_before_spike_peak ms before a spike peak
             mask_spk_dvdt = mask_dvdt_thres_crossings & extend_trues(mask_spk_peak, arg_before_spk, 0)
             # previous thing shouldnt find more than one value in each. I give back the first
             mask_spk_dvdt = mask_spk_dvdt & ~extend_trues(shift_mask(mask_spk_dvdt, 1, fill_value=False), 0,
