@@ -7,5 +7,6 @@ icglm/.idea
 iclamp_glm.egg-info/
 icglm/kernels/__pycache__/
 icglm/metrics/__pycache__/
+icglm/models/__pycache__/
 icglm/plot/__pycache__/
 icglm/utils/__pycache__/
