@@ -71,7 +71,7 @@ class DecodingPlotter:
 
     def plot_summary(self):
 
-        fig = plt.figure(figsize=(16, 7.5))
+        fig = plt.figure(figsize=(16, 10))
         fig.tight_layout()
 #         r1, r2 = 2, 1
 # #         ax_raster = [plt.subplot2grid((r1 + r2 + 1, 3), (0, 0), rowspan=r2, colspan=3) for
