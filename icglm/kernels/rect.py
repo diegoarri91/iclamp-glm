@@ -47,17 +47,19 @@ class KernelRect(Kernel):
     def area(self, dt=None):
         return np.sum(self.coefs * np.diff(self.tbins))
 
-    def plot_basis(self, t, ax=None):
+    def plot_basis(self, t, ax=None, coefs=False):
 
         if ax is None:
             fig, ax = plt.subplots()
 
         arg_bins = searchsorted(t, self.tbins)
 
-        for k, (arg0, argf) in enumerate(zip( arg_bins[:-1], arg_bins[1:] )):
+        for k, (arg0, argf) in enumerate(zip( arg_bins[:-1][::-1], arg_bins[1:][::-1] )):
             vals = np.zeros( (len(t)) )
             vals[arg0:argf] = 1.
-            # ax.plot(t, vals, linewidth = 5. - 4 . * k /(len(arg_bins ) -1.) )
+            if coefs:
+                vals[arg0:argf] = self.coefs[::-1][k + 1]
+            ax.plot(t, vals, linewidth=1, color='C' + str(9 - k))
 
         return ax
 

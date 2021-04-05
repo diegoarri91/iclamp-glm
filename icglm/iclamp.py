@@ -345,7 +345,7 @@ class IClamp:
         return np.var(spk_count, 1) / np.mean(spk_count, 1)
 
     def get_PSTH(self, kernel, average_sweeps=True):
-        psth = self.get_SpikeTrain().get_PSTH(kernel, average_sweeps=average_sweeps)
+        psth = self.get_SpikeTrain().get_psth(kernel, average_sweeps=average_sweeps)
         return psth
 
     def get_ISI_distribution(self, mask_spikes_kwargs={}):
