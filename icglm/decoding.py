@@ -6,7 +6,7 @@ from .kernels.base import KernelValues
 from .optimization import NewtonMethod
 from .utils.time import get_dt
 
-# a
+
 class BayesianDecoder:
 
     @abstractmethod
@@ -23,10 +23,10 @@ class BayesianDecoder:
 
     @abstractmethod
     def gh_log_likelihood_stim(self, stim, t, mask_spikes, sum_convolution_kappa_t_spikes, K, max_band, mu_stim,
-                               sd_stim, stim_h):
+                               sd_stim, stim_h, prior_noise, sd_noise, nbatch_noise):
         pass
 
-    def decode(self, t, mask_spikes, stim0, mu_stim, sd_stim, stim_h, prior=None, newton_kwargs=None,
+    def decode(self, t, mask_spikes, stim0, mu_stim, sd_stim, stim_h, prior=None, sd_noise=0, nbatch_noise=1, newton_kwargs=None,
                verbose=False):
         newton_kwargs = newton_kwargs.copy()
         if isinstance(mask_spikes, list):
@@ -44,7 +44,8 @@ class BayesianDecoder:
         h_log_prior = partial(prior.h_log_prior, **log_prior_kwargs)
         gh_log_likelihood = partial(self.gh_log_likelihood_stim, t=t, mask_spikes=mask_spikes,
                                     sum_convolution_kappa_t_spikes=sum_convolution_kappa_t_spikes, K=K,
-                                    max_band=max_band, mu_stim=mu_stim, sd_stim=sd_stim, stim_h=stim_h)
+                                    max_band=max_band, mu_stim=mu_stim, sd_stim=sd_stim, stim_h=stim_h, prior_noise=prior, 
+                                    sd_noise=sd_noise, nbatch_noise=nbatch_noise)
 
         optimizer = NewtonMethod(theta0=stim0, g_log_prior=g_log_prior, h_log_prior=h_log_prior,
                                  gh_log_likelihood=gh_log_likelihood, banded_h=True,
@@ -62,8 +63,8 @@ class MultiModelDecoder(BayesianDecoder):
         self.glms = glms
         self.n_decoders = len(self.glms)
 
-    def decode(self, t, mask_spikes, stim0=None, mu_stim=None, sd_stim=None, stim_h=None, prior=None,
-               newton_kwargs=None, verbose=False):
+    def decode(self, t, mask_spikes, stim0=None, mu_stim=None, sd_stim=None, stim_h=None, prior=None, sd_noise=0, 
+               nbatch_noise=1, newton_kwargs=None, verbose=False):
 
         mu_stim = mu_stim if mu_stim is not None else [0] * self.n_decoders
         sd_stim = sd_stim if sd_stim is not None else [1] * self.n_decoders
@@ -74,7 +75,7 @@ class MultiModelDecoder(BayesianDecoder):
             self.glms[n].kappa.set_values(dt)
             self.glms[n].kappa.fix_values = True
         stim_dec, optimizer = super().decode(t, mask_spikes, stim0=stim0, mu_stim=mu_stim, sd_stim=sd_stim,
-                                             stim_h=stim_h, prior=prior, newton_kwargs=newton_kwargs, verbose=verbose)
+                                             stim_h=stim_h, prior=prior, sd_noise=sd_noise, newton_kwargs=newton_kwargs, verbose=verbose)
         for n in range(self.n_decoders):
             self.glms[n].kappa.fix_values = False
         return stim_dec, optimizer
@@ -94,7 +95,7 @@ class MultiModelDecoder(BayesianDecoder):
 
     @abstractmethod
     def gh_log_likelihood_stim(self, stim, t, mask_spikes, sum_convolution_kappa_t_spikes, K, max_band, mu_stim,
-                               sd_stim, stim_h):
+                               sd_stim, stim_h, prior_noise, sd_noise, nbatch_noise):
 
         dt = get_dt(t)
 
@@ -106,7 +107,8 @@ class MultiModelDecoder(BayesianDecoder):
         for n in range(self.n_decoders):
             likelihood = self.glms[n].gh_log_likelihood_stim(stim, t, mask_spikes[n],
                                                              sum_convolution_kappa_t_spikes[n], K[n], max_band[n],
-                                                             mu_stim=mu_stim[n], sd_stim=sd_stim[n], stim_h=stim_h[n])
+                                                             mu_stim=mu_stim[n], sd_stim=sd_stim[n], stim_h=stim_h[n], 
+                                                             prior_noise=prior_noise, sd_noise=sd_noise, nbatch_noise=nbatch_noise)
             log_likelihood += likelihood[0]
             g_log_likelihood += likelihood[1]
             h_log_likelihood[:max_band[n], :] += likelihood[2]
