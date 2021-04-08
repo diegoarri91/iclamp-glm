@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 
 from .kernels.base import KernelValues
-from .optimization import NewtonMethod
+from .optimization import NewtonRaphson
 from .utils.time import get_dt
 
 
@@ -47,9 +47,14 @@ class BayesianDecoder:
                                     max_band=max_band, mu_stim=mu_stim, sd_stim=sd_stim, stim_h=stim_h, prior_noise=prior, 
                                     sd_noise=sd_noise, nbatch_noise=nbatch_noise)
 
-        optimizer = NewtonMethod(theta0=stim0, g_log_prior=g_log_prior, h_log_prior=h_log_prior,
-                                 gh_log_likelihood=gh_log_likelihood, banded_h=True,
-                                 theta_independent_h=True, verbose=verbose, **newton_kwargs)
+        if not(sd_noise > 0):
+            optimizer = NewtonMethod(theta0=stim0, g_log_prior=g_log_prior, h_log_prior=h_log_prior,
+                                     gh_log_likelihood=gh_log_likelihood, banded_h=True,
+                                     theta_independent_h=True, verbose=verbose, **newton_kwargs)
+        else:
+            optimizer = NewtonRaphson(theta0=stim0, g_log_prior=g_log_prior, h_log_prior=h_log_prior,
+                                     gh_log_likelihood=gh_log_likelihood, banded_h=True,
+                                     theta_independent_h=True, verbose=verbose, **newton_kwargs)
         optimizer.optimize()
 
         stim_dec = optimizer.theta_iterations[:, -1]
