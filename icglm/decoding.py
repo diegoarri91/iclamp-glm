@@ -3,7 +3,7 @@ from functools import partial
 import numpy as np
 
 from .kernels.base import KernelValues
-from .optimization import NewtonRaphson
+from .optimization import NewtonMethod, NewtonRaphson
 from .utils.time import get_dt
 
 

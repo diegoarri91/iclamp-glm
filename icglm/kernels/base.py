@@ -140,7 +140,7 @@ class Kernel:
         # conv.shape = (len(t), max of the array(accross each dimension))
         # A is used as convolution weights. A=(A) with len(A)=len(s[0]).
         # Assumes kernel is only defined on t >= 0
-        
+
         if type(s) is not tuple:
             s = (s,)
             
@@ -150,7 +150,7 @@ class Kernel:
         if shape is None:
             # max(s[dim]) determines the size of each dimension
             shape = tuple([max(s[dim]) + 1 for dim in range(1, len(s))])
-
+            
         arg_s = searchsorted(t, s[0])
         arg_s = np.atleast_1d(arg_s)
 

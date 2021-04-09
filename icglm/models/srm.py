@@ -117,14 +117,11 @@ class SRM(BayesianDecoder):
         arg_spikes = np.where(shift_mask(mask_spikes, 1, fill_value=False))
 #         t_spikes = (t[arg_spikes[0]], arg_spikes[1])
 #         t_spikes = (t[arg_spikes[0]], arg_spikes[1], arg_spikes[2])
-        t_spikes = tuple([t[arg_spikes[i]] for i in range(mask_spikes.ndim)])
+        t_spikes = (t[arg_spikes[0]], ) +  tuple([arg_spikes[i] for i in range(1, mask_spikes.ndim)])
 
         kappa_conv = self.kappa.convolve_continuous(t, stim - stim_h) + stim_h * self.kappa.area(dt=dt)
-#         print(kappa_conv.shape)
         eta_conv = self.eta.convolve_discrete(t, t_spikes, shape=shape[1:])
-#         print(eta_conv.shape)
         gamma_conv = self.gamma.convolve_discrete(t, t_spikes, shape=shape[1:])
-#         print(kappa_conv.shape, eta_conv.shape)
 
         v = kappa_conv - eta_conv + self.vr
         u = (v - self.vt - gamma_conv) / self.dv
@@ -195,7 +192,6 @@ class SRM(BayesianDecoder):
             h_log_likelihood = np.zeros((max_band, len(t)))
             for v in range(arg_support):
                 h_log_likelihood[v, :] += -(dt * sd_stim / self.dv) ** 2 * v_noise_factor * K[v].correlate_continuous(t, np.sum(r, 1))
-#             print('a=je')
         else:
             noise = prior_noise.sample(t, shape=(1, nbatch_noise))
             I = (stim[:, None, None]* np.sqrt(1 - sd_noise**2) + noise * sd_noise) * sd_stim + mu_stim

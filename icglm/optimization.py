@@ -90,7 +90,7 @@ class NewtonMethod:
 
             old_log_posterior = np.nan if len(self.log_posterior_iterations) < 2 else self.log_posterior_iterations[-2]
             diff_log_posterior = log_posterior - old_log_posterior
-            print(np.abs(diff_log_posterior / old_log_posterior))
+#             print(np.abs(diff_log_posterior / old_log_posterior))
             if ii > self.warm_up_iterations and baseline_lr and np.abs(diff_log_posterior / old_log_posterior) < self.stop_cond:
                 status += '\n Iteration {} of {} | Converged | '.format(ii, self.max_iterations)
                 converged = True
