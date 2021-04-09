@@ -266,7 +266,8 @@ class NewtonRaphson:
             old_log_posterior = np.nan if len(self.log_posterior_iterations) < 2 else self.log_posterior_iterations[-2]
             diff_log_posterior = log_posterior - old_log_posterior
 #             print(np.abs(diff_log_posterior / old_log_posterior))
-            cond = np.mean(np.abs(np.diff(self.log_posterior_iterations[-4:]) / np.array(self.log_posterior_iterations[-4:-1])))
+#             cond = np.mean(np.abs(np.diff(self.log_posterior_iterations[-4:]) / np.array(self.log_posterior_iterations[-4:-1])))
+            cond = np.abs(np.mean(log_posterior_iterations[-2:]) - np.mean(log_posterior_iterations[-4:-2]) / np.mean(log_posterior_iterations[-4:-2]))
             if ii > self.warm_up_iterations and baseline_lr and cond < self.stop_cond:
                 status += '\n Iteration {} of {} | Converged | '.format(ii, self.max_iterations)
                 converged = True
