@@ -254,10 +254,10 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
             log_likelihood = alpha * np.sum(Xspk_theta) - dt * np.sum(exp_X_theta_alpha)
             g_log_likelihood = alpha * np.sum(X_spikes, axis=0) - \
                                dt * np.dot(X.T, alpha * X_theta ** (alpha - 1) * exp_X_theta_alpha)
-            print(np.min(exp_X_theta_alpha), np.max(exp_X_theta_alpha))
+#             print(np.min(exp_X_theta_alpha), np.max(exp_X_theta_alpha))
             h_log_likelihood = - dt * np.dot(X.T * alpha * X_theta ** (alpha - 2) * exp_X_theta_alpha *\
                                              (alpha - 1 + X_theta ** alpha), X)
-            print(np.min(g_log_likelihood), np.max(g_log_likelihood))
+#             print(np.min(g_log_likelihood), np.max(g_log_likelihood))
             # print(alpha, np.min(h_log_likelihood), np.max(h_log_likelihood))
             # print(np.max(alpha * X_theta ** (alpha - 2) * exp_X_theta_alpha))
             print(np.min(exp_X_theta_alpha), np.max(exp_X_theta_alpha))
@@ -284,7 +284,7 @@ class GLM(BayesianSpikingModel, BayesianDecoder):
             Xspk_theta[~mask] += eps
             log_likelihood = alpha * np.sum(np.log(Xspk_theta)) - dt * np.sum(X_theta ** alpha)
             g_log_likelihood = alpha * np.sum(1 / Xspk_theta[:, None] * X_spikes, axis=0) - dt * alpha * np.matmul(X.T, X_theta ** (alpha - 1))
-            print(alpha * np.sum(np.log(Xspk_theta)), dt * np.sum(X_theta ** alpha), np.min(g_log_likelihood), np.max(g_log_likelihood))
+#             print(alpha * np.sum(np.log(Xspk_theta)), dt * np.sum(X_theta ** alpha), np.min(g_log_likelihood), np.max(g_log_likelihood))
             h_log_likelihood = -alpha * np.dot(X_spikes.T / Xspk_theta ** 2, X_spikes) - \
                                dt * alpha * (alpha - 1) * np.dot(X.T * X_theta ** (alpha - 2), X)
 

@@ -2,11 +2,11 @@
 examples/.ipynb_checkpoints/
 examples/_fit_and_decode.ipynb
 icglm/.ipynb_checkpoints/
-icglm/kernels/.ipynb_checkpoint/
-icglm/metrics/.ipynb_checkpoin/
-icglm/models/.ipynb_checkpoint/
+icglm/kernels/.ipynb_checkpoints/
+icglm/metrics/.ipynb_checkpoints/
+icglm/models/.ipynb_checkpoints/
 icglm/plot/.ipynb_checkpoints/
-icglm/utils/.ipynb_checkpoin/
+icglm/utils/.ipynb_checkpoints/
 icglm/__pycache__
 icglm/.idea
 iclamp_glm.egg-info/

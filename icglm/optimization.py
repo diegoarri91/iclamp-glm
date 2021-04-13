@@ -82,7 +82,7 @@ class NewtonMethod:
                 print('\r', 'Iteration {} of {}'.format(ii, self.max_iterations), '|',
                       'Elapsed time: {} seconds'.format(np.round(time.time() - t0, 2)), '|',
                       'log_prior={}'.format(np.round(log_prior, 2)), '|',
-                      'log_posterior={}'.format(np.round(log_posterior, 2)), end='')
+                      'log_posterior={}'.format(np.round(log_posterior, 2)), '\t', end='')
 
             self.log_prior_iterations += [log_prior]
             self.log_posterior_iterations += [log_posterior]

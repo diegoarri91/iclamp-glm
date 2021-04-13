@@ -104,7 +104,7 @@ class Kernel:
 
             if arg0 < 0 and argf > 0 and arg0 + argf - 1 >= 0:
                 convolution[arg0 + argf - 1:, ...] = full_convolution[argf - 1:len(t) - arg0, ...]
-                # convolution[arg0 + argf - 1:, ...] = full_convolution[argf - 1:len(t) - arg0, ...]
+#                 convolution = full_convolution[-arg0:len(t) - arg0, ...]
             elif arg0 >= 0 and argf > 0:
                 convolution[arg0:, ...] = full_convolution[:len(t) - arg0, ...]
             elif arg0 < 0:

@@ -170,6 +170,10 @@ class AutoCorr:
 
     def h_log_prior(self, xi):
         return -self.inv_cov_banded
+    
+    def log_det_prior_covariance(self, xi):
+        ch = cholesky_banded(-self.h_log_prior(xi), lower=True)
+        return -2 * np.sum(np.log(ch[0, :]))
 
 class GeneralCov:
 
