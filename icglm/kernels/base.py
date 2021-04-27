@@ -20,7 +20,7 @@ class Kernel:
     #     kernel_values = self.interpolate(t)
     #     return KernelValues(values=kernel_values, support=self.support)
 
-    def plot(self, t=None, ax=None, invert_t=False, invert_values=False, exp_values=False,  **kwargs):
+    def plot(self, t=None, ax=None, invert_t=False, invert_values=False, exp_values=False,  scale=1, **kwargs):
 
         if t is None:
             dt = .1
@@ -30,7 +30,7 @@ class Kernel:
             figsize = kwargs.get('figsize', (8, 5) )
             fig, ax = plt.subplots(figsize = figsize)
 
-        y = self.interpolate(t)
+        y = scale * self.interpolate(t)
         if invert_t:
             t = -t
         if invert_values:
