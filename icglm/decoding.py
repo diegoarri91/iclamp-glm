@@ -26,7 +26,7 @@ class BayesianDecoder:
                                sd_stim, stim_h, prior_noise, sd_noise, nbatch_noise):
         pass
 
-    def decode(self, t, mask_spikes, stim0, mu_stim, sd_stim, stim_h, prior=None, sd_noise=0, nbatch_noise=1, newton_kwargs=None,
+    def decode(self, t, mask_spikes, stim0, mu_stim, sd_stim, stim_h=0, prior=None, sd_noise=0, nbatch_noise=1, newton_kwargs=None,
                verbose=False):
         newton_kwargs = newton_kwargs.copy()
         if isinstance(mask_spikes, list):
