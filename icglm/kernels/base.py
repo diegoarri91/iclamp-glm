@@ -75,6 +75,9 @@ class Kernel:
     #     t_shape = (len(t_support), ) + tuple([1] * (ndim-1))
     #     self.values = self.interpolate(t_support).reshape(t_shape)
     
+    def convolve(self, t, I):
+        return self.convolve_continuous(t, I)
+    
     def convolve_continuous(self, t, I, mode='fft'):
         
         # Given a 1d-array t and an nd-array I with I.shape=(len(t),...) returns convolution,
